@@ -4,12 +4,12 @@ import api from '../services/api';
 
 export default function EditExpenseScreen({ route, navigation }) {
 
-  const { expense } = route.params;
+  const { expense } = route.params || {};
 
-  const [title, setTitle] = useState(expense.title);
-  const [amount, setAmount] = useState(String(expense.amount));
-  const [category, setCategory] = useState(expense.category);
-  const [account, setAccount] = useState(expense.account);
+  const [title, setTitle] = useState(expense?.title || '');
+  const [amount, setAmount] = useState(expense?.amount ? String(expense.amount) : '');
+  const [category, setCategory] = useState(expense?.category || '');
+  const [account, setAccount] = useState(expense?.account || '');
   const [isLoading, setIsLoading] = useState(false);
 
   // 🔹 UPDATE
@@ -22,7 +22,7 @@ export default function EditExpenseScreen({ route, navigation }) {
     try {
       setIsLoading(true);
 
-      await api.put(`/expenses/${expense._id}`, {
+      await api.put(`/expenses/${expense?._id}`, {
         title: title.trim(),
         amount: Number(amount),
         category: category.trim(),
@@ -54,7 +54,7 @@ export default function EditExpenseScreen({ route, navigation }) {
             try {
               setIsLoading(true);
 
-              await api.delete(`/expenses/${expense._id}`);
+              await api.delete(`/expenses/${expense?._id}`);
 
               Alert.alert('Deleted', 'Expense removed', [
                 { text: 'OK', onPress: () => navigation.goBack() }

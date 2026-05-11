@@ -8,7 +8,7 @@ import { PieChart, LineChart } from 'react-native-chart-kit';
 import { colors } from '../theme/colors';
 import { AuthContext } from '../context/AuthContext';
 import TransactionItem from '../components/TransactionItem';
-import ThreeDComponent from '../components/ThreeDComponent';
+// import ThreeDComponent from '../components/ThreeDComponent';
 
 import api from '../services/api';
 
@@ -114,7 +114,7 @@ export default function DashboardScreen({ navigation }) {
         {/* Balance Card */}
         <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.balanceCard}>
           <View style={[StyleSheet.absoluteFill, { opacity: 0.3, zIndex: -1 }]}>
-            <ThreeDComponent shapeType="torus" color="#FFFFFF" style={{ flex: 1, marginLeft: 120, marginTop: -30 }} />
+            {/* <ThreeDComponent shapeType="torus" color="#FFFFFF" style={{ flex: 1, marginLeft: 120, marginTop: -30 }} /> */}
           </View>
           <Text style={styles.balanceLabel}>TOTAL EXPENSES</Text>
           <Text style={styles.balanceValue}>
@@ -251,6 +251,7 @@ export default function DashboardScreen({ navigation }) {
           expenses.map((tx, index) => (
             <Animated.View key={tx._id} entering={FadeInDown.springify().delay(900 + (index * 100))}>
               <TransactionItem 
+                expense={tx}
                 title={tx.title}
                 category={tx.category}
                 date={new Date(tx.date).toLocaleDateString()}

@@ -117,6 +117,7 @@ export default function HistoryScreen({ navigation }) {
               {section.data.map((tx, txIdx) => (
                 <Animated.View key={tx._id} entering={FadeInRight.springify().delay(600 + (txIdx * 50))}>
                   <TransactionItem 
+                    expense={tx}
                     title={tx.title} 
                     category={tx.category + ' • ' + (tx.account || 'Cash')} 
                     amount={tx.amount} 

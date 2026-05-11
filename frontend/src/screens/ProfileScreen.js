@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { colors } from '../theme/colors';
 import { AuthContext } from '../context/AuthContext';
-import ThreeDComponent from '../components/ThreeDComponent';
+// import ThreeDComponent from '../components/ThreeDComponent';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useContext(AuthContext);
@@ -33,7 +33,7 @@ export default function ProfileScreen({ navigation }) {
         <Animated.View entering={FadeInDown.springify().delay(100)} style={styles.profileSection}>
           <View style={styles.avatarContainer}>
             <View style={{position: 'absolute', width: 250, height: 250, top: -75, left: -75, opacity: 0.25, zIndex: -1}}>
-               <ThreeDComponent shapeType="dodecahedron" color={colors.primary} style={{ flex: 1 }} />
+               {/* <ThreeDComponent shapeType="dodecahedron" color={colors.primary} style={{ flex: 1 }} /> */}
             </View>
             <View style={styles.avatar}>
                <Ionicons name="person" size={40} color="#ccc" />

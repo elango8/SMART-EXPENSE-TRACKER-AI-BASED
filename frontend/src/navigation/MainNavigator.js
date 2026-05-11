@@ -14,6 +14,7 @@ import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
 import SecuritySettingsScreen from '../screens/SecuritySettingsScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import EditExpenseScreen from '../screens/EditExpenseScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
