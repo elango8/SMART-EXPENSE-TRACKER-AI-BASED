@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { colors } from '../theme/colors';
 import api from '../services/api';
+import { useState, useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
 
 export default function AddExpenseScreen({ navigation }) {
+  const { user } = useContext(AuthContext);
   const [amount, setAmount] = useState('');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Shopping & Retail');
@@ -35,13 +37,14 @@ export default function AddExpenseScreen({ navigation }) {
 
     try {
       setIsLoading(true);
-
-      await api.post('/expenses/add', {
+      console.log('Saving expense...');
+      await api.post('/expenses', {
         title: title.trim(),
         amount: Number(amount),
         category: category.trim(),
         account: account.trim(),
-        date
+        date,
+        userId: user._id
       });
 
       // 🔥 Success feedback

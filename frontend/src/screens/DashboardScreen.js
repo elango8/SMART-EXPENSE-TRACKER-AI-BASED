@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { PieChart, LineChart } from 'react-native-chart-kit';
+// import { PieChart, LineChart } from 'react-native-chart-kit';
 import { colors } from '../theme/colors';
 import { AuthContext } from '../context/AuthContext';
 import TransactionItem from '../components/TransactionItem';
@@ -135,7 +135,7 @@ export default function DashboardScreen({ navigation }) {
               Category Breakdown
             </Text>
 
-            <PieChart
+            {/* <PieChart
               data={pieData}
               width={screenWidth - 40}
               height={220}
@@ -146,7 +146,7 @@ export default function DashboardScreen({ navigation }) {
               backgroundColor="transparent"
               paddingLeft="15"
               absolute
-            />
+            /> */}
           </Animated.View>
         )}
 
@@ -158,7 +158,7 @@ export default function DashboardScreen({ navigation }) {
               Monthly Trends
             </Text>
 
-            <LineChart
+            {/* <LineChart
               data={lineData}
               width={screenWidth - 40}
               height={220}
@@ -169,7 +169,7 @@ export default function DashboardScreen({ navigation }) {
                 color: () => '#0DABC6'
               }}
               style={{ borderRadius: 16 }}
-            />
+            /> */}
           </Animated.View>
         )}
 
