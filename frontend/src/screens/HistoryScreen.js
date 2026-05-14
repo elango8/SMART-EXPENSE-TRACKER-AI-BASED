@@ -36,7 +36,7 @@ export default function HistoryScreen({ navigation }) {
     try {
       setIsLoading(true);
 
-      const res = await api.get(`/expenses/${user._id}`);
+      const res = await api.get('/expenses');
 
       setExpenses(res.data);
 

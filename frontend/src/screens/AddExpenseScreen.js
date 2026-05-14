@@ -30,8 +30,8 @@ export default function AddExpenseScreen({ navigation }) {
 
   const handleSaveExpense = async () => {
     // 🔥 Validation
-    if (!title || !amount || isNaN(amount) || Number(amount) <= 0) {
-      Alert.alert('Error', 'Enter valid title and amount');
+    if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      Alert.alert('Error', 'Enter a valid amount');
       return;
     }
 

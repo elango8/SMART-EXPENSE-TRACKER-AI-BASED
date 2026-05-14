@@ -31,10 +31,15 @@ const getExpenses = async (req, res) => {
 
 const addExpense = async (req, res) => {
   try {
-    const { title, amount, category, date, account } = req.body;
+    const { amount, category, date, account } = req.body;
+    let { title } = req.body;
     
-    if (!title || !amount || !category) {
-      return res.status(400).json({ message: 'Please provide title, amount, and category' });
+    if (!amount || !category) {
+      return res.status(400).json({ message: 'Please provide amount and category' });
+    }
+
+    if (!title) {
+      title = category;
     }
 
     if (amount <= 0) {
