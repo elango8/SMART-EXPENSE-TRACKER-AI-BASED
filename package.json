@@ -4,6 +4,6 @@
     "mongodb": "^7.1.1",
     "mongoose": "^9.4.1",
     "react-native-chart-kit": "^6.12.2",
-    "react-native-svg": "^15.15.4"
+    "react-native-svg": "13.9.0"
   }
 }

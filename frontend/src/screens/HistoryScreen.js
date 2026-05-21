@@ -1,4 +1,4 @@
-import React, { useState, useContext, useCallback } from 'react';
+import React, { useState, useContext, useCallback, useRef, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -8,19 +8,129 @@ import {
   TextInput, 
   Image, 
   ActivityIndicator,
-  Alert
+  Alert,
+  Dimensions,
+  Platform
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  FadeInRight,
+  FadeIn,
+  SlideInRight,
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  withDelay,
+  interpolate,
+  Easing,
+  Layout,
+} from 'react-native-reanimated';
 
 import { colors } from '../theme/colors';
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 import TransactionItem from '../components/TransactionItem';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+/* ──────────────────────────────────────
+   FILTER CHIP COMPONENT
+   ────────────────────────────────────── */
+const FilterChip = ({ label, icon, isActive, onPress }) => {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      style={[
+        styles.filterPill,
+        isActive && styles.filterPillActive
+      ]}
+      onPress={onPress}
+    >
+      <Ionicons
+        name={icon}
+        size={14}
+        color={isActive ? '#fff' : colors.textSub}
+        style={{ marginRight: 6 }}
+      />
+      <Text style={isActive ? styles.filterTextActive : styles.filterText}>
+        {label}
+      </Text>
+      {isActive && (
+        <Ionicons
+          name="checkmark-circle"
+          size={14}
+          color="#fff"
+          style={{ marginLeft: 4 }}
+        />
+      )}
+    </TouchableOpacity>
+  );
+};
+
+/* ──────────────────────────────────────
+   SUB-FILTER SCROLL BAR
+   ────────────────────────────────────── */
+const SubFilterBar = ({ items, selected, onSelect, icon }) => {
+  const scrollRef = useRef(null);
+
+  return (
+    <Animated.View
+      entering={FadeInDown.duration(300).springify()}
+      style={styles.subFilterWrapper}
+    >
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.subFilterScroll}
+      >
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={[
+            styles.subFilterChip,
+            selected === 'All' && styles.subFilterChipActive
+          ]}
+          onPress={() => onSelect('All')}
+        >
+          <Text style={[
+            styles.subFilterChipText,
+            selected === 'All' && styles.subFilterChipTextActive
+          ]}>
+            All
+          </Text>
+        </TouchableOpacity>
+
+        {items.map((item) => (
+          <TouchableOpacity
+            key={item}
+            activeOpacity={0.7}
+            style={[
+              styles.subFilterChip,
+              selected === item && styles.subFilterChipActive
+            ]}
+            onPress={() => onSelect(item)}
+          >
+            <Text style={[
+              styles.subFilterChipText,
+              selected === item && styles.subFilterChipTextActive
+            ]}>
+              {item}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </Animated.View>
+  );
+};
+
+/* ──────────────────────────────────────
+   MAIN HISTORY SCREEN
+   ────────────────────────────────────── */
 export default function HistoryScreen({ navigation }) {
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,6 +138,11 @@ export default function HistoryScreen({ navigation }) {
 
   const [expenses, setExpenses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Filter states
+  const [activeMainFilter, setActiveMainFilter] = useState('date'); // 'date' | 'category' | 'payment'
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedPayment, setSelectedPayment] = useState('All');
 
   // FETCH EXPENSES
   const fetchExpenses = async () => {
@@ -97,11 +212,27 @@ export default function HistoryScreen({ navigation }) {
     );
   };
 
-  // FILTER EXPENSES
-  const filteredExpenses = expenses.filter(ex =>
-    ex.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    ex.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Extract unique categories and payment methods
+  const uniqueCategories = [...new Set(expenses.map(e => e.category).filter(Boolean))];
+  const uniquePayments = [...new Set(expenses.map(e => e.account || 'Cash').filter(Boolean))];
+
+  // FILTER EXPENSES — search + category/payment sub-filters
+  const filteredExpenses = expenses.filter(ex => {
+    // Search filter
+    const matchesSearch =
+      ex.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ex.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Category filter
+    const matchesCategory =
+      selectedCategory === 'All' || ex.category === selectedCategory;
+
+    // Payment filter
+    const matchesPayment =
+      selectedPayment === 'All' || (ex.account || 'Cash') === selectedPayment;
+
+    return matchesSearch && matchesCategory && matchesPayment;
+  });
 
   // GROUP BY DATE
   const groupedData = filteredExpenses.reduce((acc, curr) => {
@@ -136,14 +267,37 @@ export default function HistoryScreen({ navigation }) {
         ? '1 Transaction'
         : `${groupedData[dateStr].length} Transactions`,
 
+    total: groupedData[dateStr].reduce((sum, tx) => sum + Number(tx.amount), 0),
+
     data: groupedData[dateStr]
   }));
+
+  // Handle main filter toggle
+  const handleMainFilter = (filter) => {
+    if (activeMainFilter === filter) {
+      // Toggle off — reset to date view
+      setActiveMainFilter('date');
+      setSelectedCategory('All');
+      setSelectedPayment('All');
+    } else {
+      setActiveMainFilter(filter);
+      if (filter === 'category') setSelectedPayment('All');
+      if (filter === 'payment') setSelectedCategory('All');
+    }
+  };
+
+  // Transaction count summary
+  const totalFiltered = filteredExpenses.length;
+  const totalAmount = filteredExpenses.reduce((sum, ex) => sum + Number(ex.amount), 0);
 
   return (
 
     <SafeAreaView style={styles.safeArea}>
 
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* HEADER */}
         <View style={styles.header}>
@@ -160,22 +314,37 @@ export default function HistoryScreen({ navigation }) {
             </Text>
           </View>
 
-          <TouchableOpacity>
+          <TouchableOpacity style={styles.notifBtn}>
             <Ionicons
               name="notifications-outline"
-              size={24}
+              size={22}
               color={colors.primary}
             />
           </TouchableOpacity>
 
         </View>
 
-        {/* TITLE */}
+        {/* TITLE + SUMMARY */}
         <Animated.View entering={FadeInDown.springify().delay(100)}>
 
           <Text style={styles.screenTitle}>
             History
           </Text>
+
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryChip}>
+              <Ionicons name="receipt-outline" size={14} color="#6366F1" />
+              <Text style={styles.summaryChipText}>
+                {totalFiltered} transactions
+              </Text>
+            </View>
+            <View style={[styles.summaryChip, { backgroundColor: '#FEE2E2' }]}>
+              <Ionicons name="trending-down" size={14} color="#EF4444" />
+              <Text style={[styles.summaryChipText, { color: '#EF4444' }]}>
+                ₹{totalAmount.toLocaleString('en-IN')}
+              </Text>
+            </View>
+          </View>
 
         </Animated.View>
 
@@ -187,7 +356,7 @@ export default function HistoryScreen({ navigation }) {
 
           <Ionicons
             name="search"
-            size={20}
+            size={18}
             color={colors.textSub}
             style={styles.searchIcon}
           />
@@ -200,67 +369,64 @@ export default function HistoryScreen({ navigation }) {
             onChangeText={setSearchQuery}
           />
 
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={colors.textSub} />
+            </TouchableOpacity>
+          )}
+
         </Animated.View>
 
-        {/* FILTERS */}
-        <Animated.ScrollView
-          entering={FadeInDown.springify().delay(300)}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterContainer}
-        >
-
-          <TouchableOpacity
-            style={[
-              styles.filterPill,
-              styles.filterPillActive
-            ]}
+        {/* MAIN FILTER NAVBAR — Scrollable */}
+        <Animated.View entering={FadeInDown.springify().delay(300)}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScrollContent}
+            style={styles.filterContainer}
           >
-
-            <Ionicons
-              name="calendar"
-              size={14}
-              color="#fff"
-              style={{ marginRight: 6 }}
+            <FilterChip
+              label="Last 30 Days"
+              icon="calendar"
+              isActive={activeMainFilter === 'date'}
+              onPress={() => handleMainFilter('date')}
             />
 
-            <Text style={styles.filterTextActive}>
-              Last 30 Days
-            </Text>
-
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.filterPill}>
-
-            <Ionicons
-              name="grid-outline"
-              size={14}
-              color={colors.textSub}
-              style={{ marginRight: 6 }}
+            <FilterChip
+              label="Category"
+              icon="grid-outline"
+              isActive={activeMainFilter === 'category'}
+              onPress={() => handleMainFilter('category')}
             />
 
-            <Text style={styles.filterText}>
-              Category
-            </Text>
-
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.filterPill}>
-
-            <Ionicons
-              name="cash-outline"
-              size={14}
-              color={colors.textSub}
-              style={{ marginRight: 6 }}
+            <FilterChip
+              label="Payment"
+              icon="card-outline"
+              isActive={activeMainFilter === 'payment'}
+              onPress={() => handleMainFilter('payment')}
             />
+          </ScrollView>
+        </Animated.View>
 
-            <Text style={styles.filterText}>
-              Payment
-            </Text>
+        {/* SUB-FILTER: CATEGORY SCROLL BAR */}
+        {activeMainFilter === 'category' && uniqueCategories.length > 0 && (
+          <SubFilterBar
+            items={uniqueCategories}
+            selected={selectedCategory}
+            onSelect={setSelectedCategory}
+            icon="grid-outline"
+          />
+        )}
 
-          </TouchableOpacity>
-
-        </Animated.ScrollView>
+        {/* SUB-FILTER: PAYMENT SCROLL BAR */}
+        {activeMainFilter === 'payment' && uniquePayments.length > 0 && (
+          <SubFilterBar
+            items={uniquePayments}
+            selected={selectedPayment}
+            onSelect={setSelectedPayment}
+            icon="card-outline"
+          />
+        )}
 
         {/* ALERT */}
         <Animated.View
@@ -295,23 +461,25 @@ export default function HistoryScreen({ navigation }) {
         {/* LOADING */}
         {isLoading ? (
 
-          <ActivityIndicator
-            size="large"
-            color={colors.primary}
-            style={{ marginTop: 20 }}
-          />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator
+              size="large"
+              color={colors.primary}
+            />
+            <Text style={styles.loadingText}>Loading transactions...</Text>
+          </View>
 
         ) : sections.length === 0 ? (
 
-          <Text
-            style={{
-              textAlign: 'center',
-              color: colors.textSub,
-              marginTop: 20
-            }}
-          >
-            No expenses yet
-          </Text>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="receipt-outline" size={48} color="#D1D5DB" />
+            <Text style={styles.emptyTitle}>No transactions found</Text>
+            <Text style={styles.emptySubtext}>
+              {searchQuery || selectedCategory !== 'All' || selectedPayment !== 'All'
+                ? 'Try adjusting your filters'
+                : 'Start adding expenses to see them here'}
+            </Text>
+          </View>
 
         ) : (
 
@@ -319,69 +487,71 @@ export default function HistoryScreen({ navigation }) {
 
             <Animated.View
               key={idx}
-              entering={FadeInDown.springify().delay(500 + (idx * 100))}
+              entering={FadeInDown.springify().delay(500 + (idx * 80))}
             >
 
               {/* SECTION HEADER */}
               <View style={styles.sectionHeader}>
+                <View style={styles.sectionLeft}>
+                  <View style={styles.sectionDot} />
+                  <Text style={styles.sectionTitle}>
+                    {section.section}
+                  </Text>
+                </View>
 
-                <Text style={styles.sectionTitle}>
-                  {section.section}
-                </Text>
-
-                <Text style={styles.sectionCount}>
-                  {section.count}
-                </Text>
-
+                <View style={styles.sectionRight}>
+                  <Text style={styles.sectionTotal}>
+                    ₹{section.total.toLocaleString('en-IN')}
+                  </Text>
+                  <Text style={styles.sectionCount}>
+                    {section.count}
+                  </Text>
+                </View>
               </View>
 
               {/* TRANSACTIONS */}
-              {section.data.map((tx, txIdx) => (
+              <View style={styles.transactionGroup}>
+                {section.data.map((tx, txIdx) => (
 
-                <Animated.View
-                  key={tx._id}
-                  entering={FadeInRight.springify().delay(600 + (txIdx * 50))}
-                >
-
-                  <View style={{ position: 'relative' }}>
-
+                  <Animated.View
+                    key={tx._id}
+                    entering={FadeInRight.springify().delay(550 + (txIdx * 40))}
+                    style={styles.transactionWrapper}
+                  >
                     <TouchableOpacity
-                       onPress={() =>
+                      activeOpacity={0.85}
+                      onPress={() =>
                         navigation.navigate('EditExpense', {
                           expense: tx
                         })
                       }
+                      style={styles.transactionTouchable}
                     >
-                        <TransactionItem
-                          expense={tx}
-                          title={tx.title}
-                          category={
+                      <TransactionItem
+                        expense={tx}
+                        title={tx.title}
+                        category={
                           tx.category +
                           ' • ' +
                           (tx.account || 'Cash')
-                          }
-                          amount={tx.amount}
-                          isNegative={true}
-                        />
+                        }
+                        amount={tx.amount}
+                        isNegative={true}
+                      />
                     </TouchableOpacity>
 
-                    {/* DELETE BUTTON */}
+                    {/* DELETE BUTTON — inline icon */}
                     <TouchableOpacity
                       style={styles.deleteButton}
                       onPress={() => handleDelete(tx._id)}
                     >
-
-                      <Text style={styles.deleteButtonText}>
-                        Delete
-                      </Text>
-
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
                     </TouchableOpacity>
 
-                  </View>
+                  </Animated.View>
 
-                </Animated.View>
-
-              ))}
+                ))}
+              </View>
 
             </Animated.View>
 
@@ -400,20 +570,22 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    backgroundColor: colors.white
+    backgroundColor: '#F8FAFC'
   },
 
   container: {
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingTop: 16,
     paddingBottom: 60
   },
 
+  // ── Header ──
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    marginTop: 10
+    marginTop: 6
   },
 
   logoRow: {
@@ -433,84 +605,200 @@ const styles = StyleSheet.create({
     color: '#0DABC6'
   },
 
+  notifBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+
+  // ── Title ──
   screenTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: colors.textMain,
-    marginBottom: 24
+    marginBottom: 10,
   },
 
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+
+  summaryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+
+  summaryChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+
+  // ── Search ──
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.inputBg,
-    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     paddingHorizontal: 16,
-    height: 56,
-    marginBottom: 20
+    height: 50,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+      },
+      android: { elevation: 1 },
+    }),
   },
 
   searchIcon: {
-    marginRight: 12
+    marginRight: 10
   },
 
   searchInput: {
     flex: 1,
     height: '100%',
-    fontSize: 16,
+    fontSize: 15,
     color: colors.textMain
   },
 
+  // ── Main Filter Navbar ──
   filterContainer: {
-    flexDirection: 'row',
-    marginBottom: 30
+    marginBottom: 8,
+  },
+
+  filterScrollContent: {
+    paddingRight: 8,
+    gap: 10,
   },
 
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    height: 40,
-    borderRadius: 20,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: colors.border,
-    marginRight: 12
+    borderColor: '#E2E8F0',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
+      },
+      android: { elevation: 1 },
+    }),
   },
 
   filterPillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary
+    backgroundColor: '#6366F1',
+    borderColor: '#6366F1',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+      },
+      android: { elevation: 4 },
+    }),
   },
 
   filterText: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: colors.textSub
   },
 
   filterTextActive: {
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#fff'
   },
 
+  // ── Sub-Filter Scroll Bar ──
+  subFilterWrapper: {
+    marginBottom: 12,
+    marginTop: 4,
+  },
+
+  subFilterScroll: {
+    paddingRight: 8,
+    gap: 8,
+  },
+
+  subFilterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+
+  subFilterChipActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#6366F1',
+  },
+
+  subFilterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSub,
+  },
+
+  subFilterChipTextActive: {
+    color: '#6366F1',
+    fontWeight: '700',
+  },
+
+  // ── Alert Banner ──
   alertBanner: {
     flexDirection: 'row',
-    backgroundColor: '#FCE4EC',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 30,
-    alignItems: 'center'
+    backgroundColor: '#FFF7ED',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 8,
+    marginBottom: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
   },
 
   alertIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#fff',
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FFEDD5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16
+    marginRight: 12,
   },
 
   alertTextContainer: {
@@ -518,51 +806,130 @@ const styles = StyleSheet.create({
   },
 
   alertTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.textMain,
-    marginBottom: 4
+    marginBottom: 3
   },
 
   alertDesc: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSub,
-    lineHeight: 18
+    lineHeight: 16
   },
 
+  // ── Loading & Empty ──
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 13,
+    color: colors.textSub,
+  },
+
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+  },
+
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textMain,
+    marginTop: 12,
+  },
+
+  emptySubtext: {
+    fontSize: 13,
+    color: colors.textSub,
+    marginTop: 4,
+  },
+
+  // ── Section Header ──
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 10
+    marginTop: 20,
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+
+  sectionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  sectionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#6366F1',
+    marginRight: 8,
   },
 
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.textSub,
-    letterSpacing: 1
+    letterSpacing: 0.8,
+  },
+
+  sectionRight: {
+    alignItems: 'flex-end',
+  },
+
+  sectionTotal: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textMain,
   },
 
   sectionCount: {
-    fontSize: 11,
-    color: colors.textSub
+    fontSize: 10,
+    color: colors.textSub,
+    marginTop: 1,
   },
 
+  // ── Transaction Cards ──
+  transactionGroup: {
+    gap: 6,
+  },
+
+  transactionWrapper: {
+    position: 'relative',
+  },
+
+  transactionTouchable: {
+    // Let the TransactionItem handle its own styling
+  },
+
+  // ── Delete Button ──
   deleteButton: {
     position: 'absolute',
-    right: 10,
+    right: 18,
     top: 20,
-    backgroundColor: 'red',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8
+    width: 110,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#EF4444',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+      },
+      android: { elevation: 2 },
+    }),
   },
-
-  deleteButtonText: {
-    color: '#fff',
-    fontWeight: 'bold'
-  }
-
 });

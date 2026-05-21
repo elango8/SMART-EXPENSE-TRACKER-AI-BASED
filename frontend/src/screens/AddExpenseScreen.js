@@ -1,12 +1,148 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, Modal, Dimensions, Platform, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  FadeIn,
+  SlideInRight,
+  ZoomIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withRepeat,
+  withSequence,
+  withDelay,
+  interpolateColor,
+  Easing,
+  runOnJS,
+} from 'react-native-reanimated';
 import { colors } from '../theme/colors';
 import api from '../services/api';
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+// ─── Category config with icons & colors ─────────────────────
+const CATEGORIES = [
+  { key: 'Shopping & Retail', icon: 'bag-handle', color: '#FF6B6B', bgColor: '#FFF0F0' },
+  { key: 'Food & Dining', icon: 'restaurant', color: '#FF9F43', bgColor: '#FFF5EB' },
+  { key: 'Transport', icon: 'car-sport', color: '#54A0FF', bgColor: '#EBF5FF' },
+  { key: 'Entertainment', icon: 'game-controller', color: '#A855F7', bgColor: '#F5EBFF' },
+  { key: 'Bills', icon: 'receipt', color: '#10B981', bgColor: '#ECFDF5' },
+  { key: 'Other', icon: 'ellipsis-horizontal-circle', color: '#6B7280', bgColor: '#F3F4F6' },
+];
+
+// ─── Account config with icons & colors ──────────────────────
+const ACCOUNTS = [
+  { key: 'Cash', icon: 'cash', color: '#10B981', bgColor: '#ECFDF5' },
+  { key: 'Bank Account', icon: 'business', color: '#3B82F6', bgColor: '#EFF6FF' },
+  { key: 'Credit Card', icon: 'card', color: '#EF4444', bgColor: '#FEF2F2' },
+  { key: 'UPI', icon: 'phone-portrait', color: '#8B5CF6', bgColor: '#F5F3FF' },
+];
+
+// ─── Date options ────────────────────────────────────────────
+const DATE_OPTIONS = [
+  { label: 'Today', val: new Date(), icon: 'today' },
+  { label: 'Yesterday', val: new Date(Date.now() - 86400000), icon: 'time' },
+  { label: '2 Days Ago', val: new Date(Date.now() - 86400000 * 2), icon: 'calendar' },
+];
+
+// ─── Floating Particle Component ─────────────────────────────
+function FloatingParticle({ delay, size, left, top, color }) {
+  const translateY = useSharedValue(0);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    opacity.value = withDelay(delay, withTiming(0.6, { duration: 800 }));
+    translateY.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(-15, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      )
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color || 'rgba(255,255,255,0.15)',
+          left,
+          top,
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+}
+
+// ─── Chip Selector Component ─────────────────────────────────
+function ChipSelector({ items, selected, onSelect, type }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.chipRow}
+    >
+      {items.map((item, index) => {
+        const isSelected = selected === item.key;
+        return (
+          <Animated.View
+            key={item.key}
+            entering={SlideInRight.springify().delay(index * 80)}
+          >
+            <TouchableOpacity
+              style={[
+                styles.chip,
+                isSelected && { backgroundColor: item.color, borderColor: item.color },
+                !isSelected && { backgroundColor: item.bgColor, borderColor: item.bgColor },
+              ]}
+              onPress={() => onSelect(item.key)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={item.icon}
+                size={16}
+                color={isSelected ? '#fff' : item.color}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: isSelected ? '#fff' : item.color },
+                ]}
+                numberOfLines={1}
+              >
+                {type === 'category' ? item.key.split(' & ')[0] : item.key}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────
 export default function AddExpenseScreen({ navigation }) {
   const { user } = useContext(AuthContext);
   const [amount, setAmount] = useState('');
@@ -15,56 +151,103 @@ export default function AddExpenseScreen({ navigation }) {
   const [account, setAccount] = useState('Cash');
   const [date, setDate] = useState(new Date());
   const [uiDateString, setUiDateString] = useState('Today');
-
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState('category');
   const [isLoading, setIsLoading] = useState(false);
 
-  const categories = ['Shopping & Retail', 'Food & Dining', 'Transport', 'Entertainment', 'Bills', 'Other'];
-  const accounts = ['Cash', 'Bank Account', 'Credit Card', 'UPI'];
-  const dates = [
-    { label: 'Today', val: new Date() },
-    { label: 'Yesterday', val: new Date(Date.now() - 86400000) },
-    { label: '2 Days Ago', val: new Date(Date.now() - 86400000 * 2) },
-  ];
+  // ── Animated values ──
+  const amountScale = useSharedValue(1);
+  const saveButtonScale = useSharedValue(1);
+  const heroGlow = useSharedValue(0);
+  const pulseRing = useSharedValue(0);
 
+  useEffect(() => {
+    // Start hero glow animation
+    heroGlow.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 3000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    // Pulse ring around the amount icon
+    pulseRing.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1500, easing: Easing.out(Easing.ease) }),
+        withTiming(0, { duration: 1500, easing: Easing.in(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  // ── Amount bounce on change ──
+  useEffect(() => {
+    if (amount.length > 0) {
+      amountScale.value = withSequence(
+        withTiming(1.08, { duration: 100 }),
+        withSpring(1, { damping: 8, stiffness: 200 })
+      );
+    }
+  }, [amount]);
+
+  const amountAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: amountScale.value }],
+  }));
+
+  const pulseRingStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + pulseRing.value * 0.35 }],
+    opacity: 1 - pulseRing.value * 0.8,
+  }));
+
+  const saveButtonAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: saveButtonScale.value }],
+  }));
+
+  // ── Handlers ──
   const handleSaveExpense = async () => {
-    // 🔥 Validation
     if (!amount || isNaN(amount) || Number(amount) <= 0) {
+      // Shake the save button
+      saveButtonScale.value = withSequence(
+        withTiming(0.95, { duration: 50 }),
+        withTiming(1.05, { duration: 50 }),
+        withTiming(0.95, { duration: 50 }),
+        withSpring(1)
+      );
       Alert.alert('Error', 'Enter a valid amount');
       return;
     }
 
     try {
       setIsLoading(true);
-      console.log('Saving expense...');
       await api.post('/expenses', {
         title: title.trim(),
         amount: Number(amount),
         category: category.trim(),
         account: account.trim(),
         date,
-        userId: user._id
+        userId: user._id,
       });
 
-      // 🔥 Success feedback
+      // Success animation
+      saveButtonScale.value = withSequence(
+        withTiming(1.1, { duration: 100 }),
+        withSpring(1, { damping: 6 })
+      );
+
       Alert.alert('Success', 'Expense added successfully', [
         {
           text: 'OK',
           onPress: () => {
-            // 🔥 Reset form
             setAmount('');
             setTitle('');
             setCategory('Shopping & Retail');
             setAccount('Cash');
             setDate(new Date());
             setUiDateString('Today');
-
             navigation.goBack();
-          }
-        }
+          },
+        },
       ]);
-
     } catch (error) {
       console.log('Error saving expense:', error);
       Alert.alert('Error', error.response?.data?.message || 'Failed to save expense');
@@ -73,180 +256,513 @@ export default function AddExpenseScreen({ navigation }) {
     }
   };
 
+  const handleSavePress = () => {
+    saveButtonScale.value = withSequence(
+      withTiming(0.92, { duration: 80 }),
+      withSpring(1, { damping: 10, stiffness: 300 })
+    );
+    handleSaveExpense();
+  };
+
+  const selectedCat = CATEGORIES.find(c => c.key === category);
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* ─── Header ─────────────────────────── */}
+          <Animated.View entering={FadeInDown.springify().delay(50)} style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={22} color={colors.textMain} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Add Expense</Text>
+            <View style={{ width: 40 }} />
+          </Animated.View>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoRow}>
-            <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
-            <Text style={styles.logoText}>Finovo</Text>
-          </View>
-          <TouchableOpacity>
-            <Ionicons name="notifications-outline" size={24} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
+          {/* ─── Hero Amount Section ─────────────── */}
+          <Animated.View entering={FadeInDown.springify().delay(120)} style={styles.heroCard}>
+            {/* Floating particles */}
+            <FloatingParticle delay={0} size={8} left="10%" top="15%" color="rgba(255,255,255,0.12)" />
+            <FloatingParticle delay={400} size={12} left="80%" top="20%" color="rgba(255,255,255,0.1)" />
+            <FloatingParticle delay={800} size={6} left="65%" top="75%" color="rgba(255,255,255,0.15)" />
+            <FloatingParticle delay={200} size={10} left="25%" top="80%" color="rgba(255,255,255,0.08)" />
+            <FloatingParticle delay={600} size={14} left="90%" top="55%" color="rgba(255,255,255,0.06)" />
 
-        {/* Amount Section */}
-        <Animated.View entering={FadeInDown.springify().delay(100)} style={styles.amountSection}>
-          <View style={styles.avatarPlaceholder}>
-            <View style={styles.plusBadge}>
-              <Ionicons name="add" size={16} color="#fff" />
-            </View>
-          </View>
+            {/* Decorative circles */}
+            <View style={styles.heroCircle1} />
+            <View style={styles.heroCircle2} />
 
-          <Text style={styles.subtext}>
-            ADD EXPENSES <Text style={styles.blueText}>(MANUAL ENTRY)</Text>
-          </Text>
-
-          <View style={styles.amountInputRow}>
-            <Text style={styles.currencySymbol}>₹</Text>
-            <TextInput 
-              style={styles.amountInput}
-              keyboardType="numeric"
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="0"
-              placeholderTextColor={colors.textSub}
-            />
-          </View>
-        </Animated.View>
-
-        {/* Form */}
-        <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.form}>
-          <Text style={styles.label}>CATEGORY</Text>
-          <TouchableOpacity style={styles.inputPill} onPress={() => { setModalType('category'); setModalVisible(true); }}>
-            <Ionicons name="bag-outline" size={20} color="#E91E63" style={styles.iconLeft} />
-            <Text style={styles.inputText}>{category}</Text>
-            <Ionicons name="chevron-down" size={20} color={colors.textSub} style={styles.iconRight} />
-          </TouchableOpacity>
-
-          <Text style={styles.label}>TRANSACTION DATE</Text>
-          <TouchableOpacity style={styles.inputPill} onPress={() => { setModalType('date'); setModalVisible(true); }}>
-            <Ionicons name="calendar-outline" size={20} color={colors.primary} style={styles.iconLeft} />
-            <Text style={styles.inputText}>{uiDateString}</Text>
-            <Ionicons name="chevron-down" size={20} color={colors.textSub} style={styles.iconRight} />
-          </TouchableOpacity>
-
-          <Text style={styles.label}>ACCOUNT</Text>
-          <TouchableOpacity style={styles.inputPill} onPress={() => { setModalType('account'); setModalVisible(true); }}>
-            <Ionicons name="card" size={20} color={colors.primary} style={styles.iconLeft} />
-            <Text style={styles.inputText}>{account}</Text>
-            <Ionicons name="chevron-down" size={20} color={colors.textSub} style={styles.iconRight} />
-          </TouchableOpacity>
-
-          <Text style={styles.label}>TITLE</Text>
-          <View style={[styles.textAreaContainer, { minHeight: 60 }]}>
-            <TextInput 
-              style={styles.textArea}
-              placeholder="What was this for?"
-              placeholderTextColor={colors.textSub}
-              value={title}
-              onChangeText={setTitle}
-            />
-          </View>
-        </Animated.View>
-
-        {/* Save Button */}
-        <Animated.View entering={FadeInDown.springify().delay(300)}>
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveExpense} disabled={isLoading}>
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.saveBtnText}>Save Expense</Text>
-                <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginLeft: 8 }} />
-              </>
-            )}
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Cancel */}
-        <Animated.View entering={FadeInDown.springify().delay(400)}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.cancelBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        </Animated.View>
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* Modal */}
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                Select {modalType === 'category' ? 'Category' : modalType === 'account' ? 'Account' : 'Date'}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textMain} />
-              </TouchableOpacity>
+            {/* Amount icon with pulse ring */}
+            <View style={styles.amountIconWrap}>
+              <Animated.View style={[styles.pulseRing, pulseRingStyle]} />
+              <Animated.View entering={ZoomIn.springify().delay(300)} style={styles.amountIconInner}>
+                <Ionicons name="wallet" size={28} color="#fff" />
+              </Animated.View>
             </View>
 
-            {modalType === 'category' && categories.map(c => (
-              <TouchableOpacity key={c} style={styles.modalItem} onPress={() => { setCategory(c); setModalVisible(false); }}>
-                <Text style={styles.modalItemText}>{c}</Text>
-              </TouchableOpacity>
-            ))}
+            <Animated.Text entering={FadeIn.delay(400)} style={styles.heroLabel}>
+              ENTER AMOUNT
+            </Animated.Text>
 
-            {modalType === 'account' && accounts.map(a => (
-              <TouchableOpacity key={a} style={styles.modalItem} onPress={() => { setAccount(a); setModalVisible(false); }}>
-                <Text style={styles.modalItemText}>{a}</Text>
-              </TouchableOpacity>
-            ))}
+            {/* Amount Input - FIXED RESPONSIVENESS */}
+            <Animated.View style={[styles.amountInputRow, amountAnimStyle]}>
+              <Text style={styles.currencySymbol}>₹</Text>
+              <TextInput
+                style={styles.amountInput}
+                keyboardType="numeric"
+                value={amount}
+                onChangeText={setAmount}
+                placeholder="0"
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                maxLength={10}
+                textAlign="center"
+                selectionColor="rgba(255,255,255,0.5)"
+              />
+            </Animated.View>
 
-            {modalType === 'date' && dates.map(d => (
-              <TouchableOpacity key={d.label} style={styles.modalItem} onPress={() => { setDate(d.val); setUiDateString(d.label); setModalVisible(false); }}>
-                <Text style={styles.modalItemText}>{d.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+            <Animated.Text entering={FadeIn.delay(500)} style={styles.heroHint}>
+              Tap to enter your expense amount
+            </Animated.Text>
+          </Animated.View>
+
+          {/* ─── Category Selector ──────────────── */}
+          <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIcon, { backgroundColor: selectedCat?.bgColor || '#F3F4F6' }]}>
+                <Ionicons name="pricetag" size={16} color={selectedCat?.color || colors.primary} />
+              </View>
+              <Text style={styles.sectionTitle}>Category</Text>
+            </View>
+            <ChipSelector
+              items={CATEGORIES}
+              selected={category}
+              onSelect={setCategory}
+              type="category"
+            />
+          </Animated.View>
+
+          {/* ─── Account Selector ───────────────── */}
+          <Animated.View entering={FadeInDown.springify().delay(300)} style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIcon, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name="card" size={16} color="#3B82F6" />
+              </View>
+              <Text style={styles.sectionTitle}>Payment Method</Text>
+            </View>
+            <ChipSelector
+              items={ACCOUNTS}
+              selected={account}
+              onSelect={setAccount}
+              type="account"
+            />
+          </Animated.View>
+
+          {/* ─── Date Selector ──────────────────── */}
+          <Animated.View entering={FadeInDown.springify().delay(400)} style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIcon, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="calendar" size={16} color="#F59E0B" />
+              </View>
+              <Text style={styles.sectionTitle}>When</Text>
+            </View>
+            <View style={styles.dateRow}>
+              {DATE_OPTIONS.map((d, index) => {
+                const isSelected = uiDateString === d.label;
+                return (
+                  <Animated.View
+                    key={d.label}
+                    entering={SlideInRight.springify().delay(index * 100)}
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.dateChip,
+                        isSelected && styles.dateChipSelected,
+                      ]}
+                      onPress={() => {
+                        setDate(d.val);
+                        setUiDateString(d.label);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={d.icon}
+                        size={16}
+                        color={isSelected ? '#fff' : '#F59E0B'}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text
+                        style={[
+                          styles.dateChipText,
+                          isSelected && styles.dateChipTextSelected,
+                        ]}
+                      >
+                        {d.label}
+                      </Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                );
+              })}
+            </View>
+          </Animated.View>
+
+          {/* ─── Title / Note ───────────────────── */}
+          <Animated.View entering={FadeInDown.springify().delay(500)} style={styles.sectionWrap}>
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIcon, { backgroundColor: '#F3E8FF' }]}>
+                <Ionicons name="create" size={16} color="#A855F7" />
+              </View>
+              <Text style={styles.sectionTitle}>Note</Text>
+              <Text style={styles.optionalTag}>Optional</Text>
+            </View>
+            <View style={styles.noteInputWrap}>
+              <TextInput
+                style={styles.noteInput}
+                placeholder="What was this expense for?"
+                placeholderTextColor="#B0B8C4"
+                value={title}
+                onChangeText={setTitle}
+                multiline
+                maxLength={120}
+              />
+              <Text style={styles.charCount}>{title.length}/120</Text>
+            </View>
+          </Animated.View>
+
+          {/* ─── Save Button ───────────────────── */}
+          <Animated.View entering={FadeInUp.springify().delay(600)}>
+            <AnimatedTouchable
+              style={[styles.saveBtn, saveButtonAnimStyle]}
+              onPress={handleSavePress}
+              disabled={isLoading}
+              activeOpacity={0.85}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <View style={styles.saveBtnInner}>
+                  <View style={styles.saveBtnIconWrap}>
+                    <Ionicons name="checkmark-circle" size={22} color="#fff" />
+                  </View>
+                  <Text style={styles.saveBtnText}>Save Expense</Text>
+                  <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.7)" />
+                </View>
+              )}
+            </AnimatedTouchable>
+          </Animated.View>
+
+          {/* ─── Cancel ────────────────────────── */}
+          <Animated.View entering={FadeIn.delay(700)}>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.6}
+            >
+              <Ionicons name="close-circle-outline" size={18} color={colors.textSub} style={{ marginRight: 6 }} />
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-// 🔹 Styles (unchanged)
+// ─── Styles ──────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.white },
-  container: { padding: 24, paddingBottom: 60 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 10 },
-  logoRow: { flexDirection: 'row', alignItems: 'center' },
-  logoImage: { width: 32, height: 32, marginRight: 8 },
-  logoText: { fontSize: 20, fontWeight: 'bold', color: '#0DABC6' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  container: {
+    paddingHorizontal: 20,
+    paddingBottom: 60,
+  },
 
-  amountSection: { alignItems: 'center', marginBottom: 40, marginTop: 10 },
-  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FCE4EC', marginBottom: 24, justifyContent: 'center', alignItems: 'center' },
-  plusBadge: { position: 'absolute', top: -5, right: -5, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff' },
-  subtext: { fontSize: 11, fontWeight: 'bold', color: colors.textSub, letterSpacing: 1, marginBottom: 16 },
-  blueText: { color: colors.primary },
-  amountInputRow: { flexDirection: 'row', alignItems: 'center' },
-  currencySymbol: { fontSize: 48, fontWeight: 'bold', color: colors.primary, marginRight: 8 },
-  amountInput: { fontSize: 56, fontWeight: 'bold', color: colors.textSub, minWidth: 100 },
+  // ── Header ──
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textMain,
+    letterSpacing: 0.3,
+  },
 
-  form: { marginBottom: 40 },
-  label: { fontSize: 10, fontWeight: 'bold', color: colors.textSub, letterSpacing: 1, marginBottom: 12 },
-  inputPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.inputBg, borderRadius: 24, paddingHorizontal: 20, height: 60, marginBottom: 24 },
-  iconLeft: { marginRight: 16 },
-  inputText: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.textMain },
-  iconRight: { marginLeft: 16 },
+  // ── Hero Card ──
+  heroCard: {
+    borderRadius: 28,
+    paddingVertical: 36,
+    paddingHorizontal: 24,
+    marginBottom: 28,
+    alignItems: 'center',
+    overflow: 'hidden',
+    // Gradient simulation with layered backgrounds
+    backgroundColor: '#0B63F6',
+    shadowColor: '#0B63F6',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  heroCircle1: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    right: -60,
+    top: -40,
+  },
+  heroCircle2: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    left: -40,
+    bottom: -30,
+  },
+  amountIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  amountIconInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 2,
+    marginBottom: 12,
+  },
+  amountInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    minHeight: 70,
+  },
+  currencySymbol: {
+    fontSize: 40,
+    fontWeight: '800',
+    color: '#fff',
+    marginRight: 4,
+  },
+  amountInput: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: '#fff',
+    flex: 1,
+    maxWidth: SCREEN_WIDTH * 0.55,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    textAlign: 'center',
+  },
+  heroHint: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.45)',
+    marginTop: 8,
+  },
 
-  textAreaContainer: { backgroundColor: colors.inputBg, borderRadius: 24, padding: 20, minHeight: 120 },
-  textArea: { flex: 1, fontSize: 16, color: colors.textMain, textAlignVertical: 'top' },
+  // ── Sections ──
+  sectionWrap: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  sectionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textMain,
+    flex: 1,
+  },
+  optionalTag: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#B0B8C4',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
 
-  saveBtn: { flexDirection: 'row', backgroundColor: colors.primary, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  cancelBtn: { alignItems: 'center', height: 40, justifyContent: 'center' },
-  cancelBtnText: { color: colors.textSub, fontSize: 14, fontWeight: '600' },
+  // ── Chips ──
+  chipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 20,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1.5,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textMain },
-  modalItem: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalItemText: { fontSize: 16, color: colors.textMain }
+  // ── Date ──
+  dateRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  dateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1.5,
+    borderColor: '#FEF3C7',
+  },
+  dateChipSelected: {
+    backgroundColor: '#F59E0B',
+    borderColor: '#F59E0B',
+  },
+  dateChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  dateChipTextSelected: {
+    color: '#fff',
+  },
+
+  // ── Note ──
+  noteInputWrap: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 18,
+    minHeight: 90,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F0F1F3',
+  },
+  noteInput: {
+    fontSize: 15,
+    color: colors.textMain,
+    textAlignVertical: 'top',
+    lineHeight: 22,
+    minHeight: 50,
+  },
+  charCount: {
+    textAlign: 'right',
+    fontSize: 11,
+    color: '#C4C9D0',
+    marginTop: 4,
+  },
+
+  // ── Save Button ──
+  saveBtn: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    marginBottom: 16,
+    backgroundColor: '#0B63F6',
+    shadowColor: '#0B63F6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  saveBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 58,
+    paddingHorizontal: 24,
+  },
+  saveBtnIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+    flex: 1,
+    letterSpacing: 0.3,
+  },
+
+  // ── Cancel ──
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+  },
+  cancelBtnText: {
+    color: colors.textSub,
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
-

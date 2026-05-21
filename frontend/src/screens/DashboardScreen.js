@@ -235,30 +235,39 @@ export default function DashboardScreen({ navigation }) {
 
         {/* Recent Transactions */}
         <Animated.View entering={FadeInDown.springify().delay(800)} style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('History')}>
+          <View>
+            <Text style={styles.sectionTitle}>Recent Transactions</Text>
+            <Text style={styles.sectionSub}>Your latest activity</Text>
+          </View>
+          <TouchableOpacity style={styles.viewAllPill} onPress={() => navigation.navigate('History')}>
             <Text style={styles.viewAllBtn}>View All</Text>
+            <Ionicons name="arrow-forward" size={14} color={colors.primary} style={{ marginLeft: 4 }} />
           </TouchableOpacity>
         </Animated.View>
 
         {isLoading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
         ) : expenses.length === 0 ? (
-          <Text style={{ textAlign: 'center', color: colors.textSub, marginTop: 20 }}>
-            No expenses yet
-          </Text>
+          <View style={styles.emptyState}>
+            <Ionicons name="receipt-outline" size={48} color={colors.border} />
+            <Text style={styles.emptyTitle}>No transactions yet</Text>
+            <Text style={styles.emptySub}>Start adding expenses to see them here</Text>
+          </View>
         ) : (
-          expenses.map((tx, index) => (
-            <Animated.View key={tx._id} entering={FadeInDown.springify().delay(900 + (index * 100))}>
-              <TransactionItem 
-                expense={tx}
-                title={tx.title}
-                category={tx.category}
-                date={new Date(tx.date).toLocaleDateString()}
-                amount={tx.amount}
-              />
-            </Animated.View>
-          ))
+          [...expenses]
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, 5)
+            .map((tx, index) => (
+              <Animated.View key={tx._id} entering={FadeInDown.springify().delay(900 + (index * 100))}>
+                <TransactionItem 
+                  expense={tx}
+                  title={tx.title}
+                  category={tx.category}
+                  date={new Date(tx.date).toLocaleDateString()}
+                  amount={tx.amount}
+                />
+              </Animated.View>
+            ))
         )}
 
         <View style={{ height: 80 }} />
@@ -310,6 +319,12 @@ const styles = StyleSheet.create({
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textMain },
-  viewAllBtn: { color: colors.primary, fontWeight: 'bold', fontSize: 14 },
+  sectionSub: { fontSize: 12, color: colors.textSub, marginTop: 2 },
+  viewAllPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EBF2FF', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  viewAllBtn: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+
+  emptyState: { alignItems: 'center', paddingVertical: 40 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textMain, marginTop: 12 },
+  emptySub: { fontSize: 13, color: colors.textSub, marginTop: 4 },
 });
 
