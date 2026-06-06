@@ -43,8 +43,29 @@ export const AuthProvider = ({ children }) => {
     AsyncStorage.removeItem('userToken');
   };
 
+  // Update user profile data in state and AsyncStorage
+  const updateUser = (updatedUserData) => {
+    const newUser = { ...user, ...updatedUserData };
+    setUser(newUser);
+    if (updatedUserData.token) {
+      setUserToken(updatedUserData.token);
+      AsyncStorage.setItem('userToken', updatedUserData.token);
+    }
+    AsyncStorage.setItem('userInfo', JSON.stringify(newUser));
+  };
+
+  // Update only preferences in user state and AsyncStorage
+  const updatePreferences = (newPreferences) => {
+    const newUser = {
+      ...user,
+      preferences: { ...(user?.preferences || {}), ...newPreferences },
+    };
+    setUser(newUser);
+    AsyncStorage.setItem('userInfo', JSON.stringify(newUser));
+  };
+
   return (
-    <AuthContext.Provider value={{ login, logout, user, userToken, isLoading }}>
+    <AuthContext.Provider value={{ login, logout, user, userToken, isLoading, updateUser, updatePreferences }}>
       {children}
     </AuthContext.Provider>
   );

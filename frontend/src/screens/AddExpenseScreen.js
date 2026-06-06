@@ -95,50 +95,109 @@ function FloatingParticle({ delay, size, left, top, color }) {
   );
 }
 
-// ─── Chip Selector Component ─────────────────────────────────
-function ChipSelector({ items, selected, onSelect, type }) {
+// ─── Dropdown Selector Component ─────────────────────────────
+function DropdownSelector({ items, selected, onSelect, label, icon, iconBgColor, iconColor }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedItem = items.find(i => i.key === selected);
+
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.chipRow}
-    >
-      {items.map((item, index) => {
-        const isSelected = selected === item.key;
-        return (
-          <Animated.View
-            key={item.key}
-            entering={SlideInRight.springify().delay(index * 80)}
-          >
-            <TouchableOpacity
-              style={[
-                styles.chip,
-                isSelected && { backgroundColor: item.color, borderColor: item.color },
-                !isSelected && { backgroundColor: item.bgColor, borderColor: item.bgColor },
-              ]}
-              onPress={() => onSelect(item.key)}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={item.icon}
-                size={16}
-                color={isSelected ? '#fff' : item.color}
-                style={{ marginRight: 6 }}
-              />
-              <Text
-                style={[
-                  styles.chipText,
-                  { color: isSelected ? '#fff' : item.color },
-                ]}
-                numberOfLines={1}
+    <>
+      {/* Dropdown Trigger */}
+      <TouchableOpacity
+        style={styles.dropdownTrigger}
+        onPress={() => setIsOpen(true)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.dropdownTriggerLeft}>
+          {selectedItem && (
+            <View style={[styles.dropdownSelectedIcon, { backgroundColor: selectedItem.bgColor }]}>
+              <Ionicons name={selectedItem.icon} size={18} color={selectedItem.color} />
+            </View>
+          )}
+          <View style={styles.dropdownTriggerTextWrap}>
+            <Text style={styles.dropdownTriggerLabel}>{label}</Text>
+            <Text style={styles.dropdownTriggerValue}>{selectedItem?.key || 'Select'}</Text>
+          </View>
+        </View>
+        <View style={styles.dropdownChevronWrap}>
+          <Ionicons name="chevron-down" size={18} color="#94A3B8" />
+        </View>
+      </TouchableOpacity>
+
+      {/* Dropdown Modal */}
+      <Modal
+        visible={isOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsOpen(false)}
+        >
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={[styles.modalHeaderIcon, { backgroundColor: iconBgColor || '#EEF2FF' }]}>
+                <Ionicons name={icon || 'list'} size={18} color={iconColor || '#6366F1'} />
+              </View>
+              <Text style={styles.modalTitle}>Select {label}</Text>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setIsOpen(false)}
               >
-                {type === 'category' ? item.key.split(' & ')[0] : item.key}
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-        );
-      })}
-    </ScrollView>
+                <Ionicons name="close" size={20} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Divider */}
+            <View style={styles.modalDivider} />
+
+            {/* Options */}
+            <ScrollView
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              {items.map((item, index) => {
+                const isSelected = selected === item.key;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[
+                      styles.modalOption,
+                      isSelected && styles.modalOptionSelected,
+                      index === items.length - 1 && { borderBottomWidth: 0 },
+                    ]}
+                    onPress={() => {
+                      onSelect(item.key);
+                      setIsOpen(false);
+                    }}
+                    activeOpacity={0.6}
+                  >
+                    <View style={[styles.modalOptionIcon, { backgroundColor: isSelected ? item.color + '20' : item.bgColor }]}>
+                      <Ionicons name={item.icon} size={20} color={item.color} />
+                    </View>
+                    <Text style={[
+                      styles.modalOptionText,
+                      isSelected && { color: item.color, fontWeight: '800' },
+                    ]}>
+                      {item.key}
+                    </Text>
+                    {isSelected && (
+                      <View style={[styles.modalCheckCircle, { backgroundColor: item.color }]}>
+                        <Ionicons name="checkmark" size={14} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
   );
 }
 
@@ -290,14 +349,13 @@ export default function AddExpenseScreen({ navigation }) {
             <View style={{ width: 40 }} />
           </Animated.View>
 
-          {/* ─── Hero Amount Section ─────────────── */}
+          {/* ─── Hero Amount Section (Compact) ─── */}
           <Animated.View entering={FadeInDown.springify().delay(120)} style={styles.heroCard}>
             {/* Floating particles */}
             <FloatingParticle delay={0} size={8} left="10%" top="15%" color="rgba(255,255,255,0.12)" />
             <FloatingParticle delay={400} size={12} left="80%" top="20%" color="rgba(255,255,255,0.1)" />
             <FloatingParticle delay={800} size={6} left="65%" top="75%" color="rgba(255,255,255,0.15)" />
             <FloatingParticle delay={200} size={10} left="25%" top="80%" color="rgba(255,255,255,0.08)" />
-            <FloatingParticle delay={600} size={14} left="90%" top="55%" color="rgba(255,255,255,0.06)" />
 
             {/* Decorative circles */}
             <View style={styles.heroCircle1} />
@@ -307,7 +365,7 @@ export default function AddExpenseScreen({ navigation }) {
             <View style={styles.amountIconWrap}>
               <Animated.View style={[styles.pulseRing, pulseRingStyle]} />
               <Animated.View entering={ZoomIn.springify().delay(300)} style={styles.amountIconInner}>
-                <Ionicons name="wallet" size={28} color="#fff" />
+                <Ionicons name="wallet" size={22} color="#fff" />
               </Animated.View>
             </View>
 
@@ -315,7 +373,7 @@ export default function AddExpenseScreen({ navigation }) {
               ENTER AMOUNT
             </Animated.Text>
 
-            {/* Amount Input - FIXED RESPONSIVENESS */}
+            {/* Amount Input - Compact */}
             <Animated.View style={[styles.amountInputRow, amountAnimStyle]}>
               <Text style={styles.currencySymbol}>₹</Text>
               <TextInput
@@ -330,13 +388,9 @@ export default function AddExpenseScreen({ navigation }) {
                 selectionColor="rgba(255,255,255,0.5)"
               />
             </Animated.View>
-
-            <Animated.Text entering={FadeIn.delay(500)} style={styles.heroHint}>
-              Tap to enter your expense amount
-            </Animated.Text>
           </Animated.View>
 
-          {/* ─── Category Selector ──────────────── */}
+          {/* ─── Category Dropdown ──────────────── */}
           <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
               <View style={[styles.sectionIcon, { backgroundColor: selectedCat?.bgColor || '#F3F4F6' }]}>
@@ -344,15 +398,18 @@ export default function AddExpenseScreen({ navigation }) {
               </View>
               <Text style={styles.sectionTitle}>Category</Text>
             </View>
-            <ChipSelector
+            <DropdownSelector
               items={CATEGORIES}
               selected={category}
               onSelect={setCategory}
-              type="category"
+              label="Category"
+              icon="pricetag"
+              iconBgColor={selectedCat?.bgColor}
+              iconColor={selectedCat?.color}
             />
           </Animated.View>
 
-          {/* ─── Account Selector ───────────────── */}
+          {/* ─── Payment Method Dropdown ──────── */}
           <Animated.View entering={FadeInDown.springify().delay(300)} style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
               <View style={[styles.sectionIcon, { backgroundColor: '#EFF6FF' }]}>
@@ -360,11 +417,14 @@ export default function AddExpenseScreen({ navigation }) {
               </View>
               <Text style={styles.sectionTitle}>Payment Method</Text>
             </View>
-            <ChipSelector
+            <DropdownSelector
               items={ACCOUNTS}
               selected={account}
               onSelect={setAccount}
-              type="account"
+              label="Payment Method"
+              icon="card"
+              iconBgColor="#EFF6FF"
+              iconColor="#3B82F6"
             />
           </Animated.View>
 
@@ -518,21 +578,20 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // ── Hero Card ──
+  // ── Hero Card (Compact) ──
   heroCard: {
-    borderRadius: 28,
-    paddingVertical: 36,
+    borderRadius: 24,
+    paddingVertical: 22,
     paddingHorizontal: 24,
-    marginBottom: 28,
+    marginBottom: 24,
     alignItems: 'center',
     overflow: 'hidden',
-    // Gradient simulation with layered backgrounds
     backgroundColor: '#0B63F6',
     shadowColor: '#0B63F6',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
   heroCircle1: {
     position: 'absolute',
@@ -555,58 +614,58 @@ const styles = StyleSheet.create({
   amountIconWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   pulseRing: {
     position: 'absolute',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.25)',
   },
   amountIconInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: 'rgba(255,255,255,0.6)',
     letterSpacing: 2,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   amountInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    minHeight: 70,
+    minHeight: 50,
   },
   currencySymbol: {
-    fontSize: 40,
+    fontSize: 32,
     fontWeight: '800',
     color: '#fff',
     marginRight: 4,
   },
   amountInput: {
-    fontSize: 48,
+    fontSize: 40,
     fontWeight: '800',
     color: '#fff',
     flex: 1,
     maxWidth: SCREEN_WIDTH * 0.55,
-    paddingVertical: 4,
+    paddingVertical: 2,
     paddingHorizontal: 8,
     textAlign: 'center',
   },
   heroHint: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255,255,255,0.45)',
-    marginTop: 8,
+    marginTop: 4,
   },
 
   // ── Sections ──
@@ -642,23 +701,147 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
 
-  // ── Chips ──
-  chipRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingRight: 20,
-  },
-  chip: {
+  // ── Dropdown Trigger ──
+  dropdownTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1.5,
+    borderColor: '#F0F1F3',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+      },
+      android: { elevation: 2 },
+    }),
   },
-  chipText: {
-    fontSize: 13,
+  dropdownTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dropdownSelectedIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  dropdownTriggerTextWrap: {
+    flex: 1,
+  },
+  dropdownTriggerLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  dropdownTriggerValue: {
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textMain,
+  },
+  dropdownChevronWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Modal ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    maxHeight: SCREEN_HEIGHT * 0.55,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  modalHeaderIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.textMain,
+    flex: 1,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginHorizontal: 20,
+    marginBottom: 8,
+  },
+  modalScroll: {
+    paddingHorizontal: 20,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  modalOptionSelected: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    marginHorizontal: -8,
+    paddingHorizontal: 8,
+  },
+  modalOptionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  modalOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textMain,
+    flex: 1,
+  },
+  modalCheckCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ── Date ──

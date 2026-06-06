@@ -19,6 +19,7 @@ export default function DashboardScreen({ navigation }) {
 
   const [expenses, setExpenses] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [dashboardSummary, setDashboardSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // 🔹 Fetch Expenses
@@ -58,12 +59,22 @@ export default function DashboardScreen({ navigation }) {
     }
   };
 
+  // 🔹 Fetch Dashboard Summary
+  const fetchDashboardSummary = async () => {
+    try {
+      const res = await api.get('/dashboard/summary');
+      setDashboardSummary(res.data);
+    } catch (error) {
+      console.log('Error fetching dashboard summary:', error);
+    }
+  };
+
   // 🔹 Refresh when screen focused
   useFocusEffect(
     useCallback(() => {
       if (user?._id) {
         setIsLoading(true);
-        Promise.all([fetchExpenses(), fetchAnalytics()])
+        Promise.all([fetchExpenses(), fetchAnalytics(), fetchDashboardSummary()])
           .finally(() => setIsLoading(false));
       }
     }, [user])
@@ -89,6 +100,13 @@ export default function DashboardScreen({ navigation }) {
 
   // 🔹 Top Category Insight
   const topCategory = analytics?.categoryBreakdown?.[0]?.name;
+
+  // 🔹 Currency symbol from preferences
+  const currencySymbol = (() => {
+    const c = user?.preferences?.currency || 'INR';
+    const map = { INR: '₹', USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
+    return map[c] || '₹';
+  })();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -118,7 +136,7 @@ export default function DashboardScreen({ navigation }) {
           </View>
           <Text style={styles.balanceLabel}>TOTAL EXPENSES</Text>
           <Text style={styles.balanceValue}>
-            ₹ {(analytics?.totalSpent ?? totalAmount).toFixed(2)}
+            {currencySymbol} {(analytics?.totalSpent ?? totalAmount).toFixed(2)}
           </Text>
           <View style={styles.trendContainer}>
             <Ionicons name="trending-up" size={16} color="#FFD166" />
@@ -173,6 +191,77 @@ export default function DashboardScreen({ navigation }) {
           </Animated.View>
         )}
 
+        {/* Dynamic Summary Cards */}
+        <Animated.View entering={FadeInDown.springify().delay(480)} style={styles.summarySection}>
+          <Text style={styles.summarySectionTitle}>Quick Insights</Text>
+          <View style={styles.summaryGrid}>
+            {/* Monthly Transactions */}
+            <View style={[styles.summaryCard, { backgroundColor: '#EEF2FF' }]}>
+              <View style={[styles.summaryIconBg, { backgroundColor: '#C7D2FE' }]}>
+                <Ionicons name="calendar" size={18} color="#4F46E5" />
+              </View>
+              <Text style={[styles.summaryCardValue, { color: '#4F46E5' }]}>
+                {dashboardSummary?.monthlyCount ?? '—'}
+              </Text>
+              <Text style={styles.summaryCardLabel}>This Month</Text>
+            </View>
+            {/* Weekly Transactions */}
+            <View style={[styles.summaryCard, { backgroundColor: '#F0FDF4' }]}>
+              <View style={[styles.summaryIconBg, { backgroundColor: '#BBF7D0' }]}>
+                <Ionicons name="trending-up" size={18} color="#16A34A" />
+              </View>
+              <Text style={[styles.summaryCardValue, { color: '#16A34A' }]}>
+                {dashboardSummary?.weeklyCount ?? '—'}
+              </Text>
+              <Text style={styles.summaryCardLabel}>This Week</Text>
+            </View>
+            {/* Top Category */}
+            <View style={[styles.summaryCard, { backgroundColor: '#FFF7ED' }]}>
+              <View style={[styles.summaryIconBg, { backgroundColor: '#FED7AA' }]}>
+                <Ionicons name="trophy" size={18} color="#EA580C" />
+              </View>
+              <Text style={[styles.summaryCardValue, { color: '#EA580C' }]} numberOfLines={1}>
+                {dashboardSummary?.topCategory?.name ?? '—'}
+              </Text>
+              <Text style={styles.summaryCardLabel}>Top Category</Text>
+            </View>
+            {/* Budget Remaining */}
+            <View style={[styles.summaryCard, { backgroundColor: dashboardSummary?.budgetRemaining < 0 ? '#FEF2F2' : '#ECFDF5' }]}>
+              <View style={[styles.summaryIconBg, { backgroundColor: dashboardSummary?.budgetRemaining < 0 ? '#FECACA' : '#A7F3D0' }]}>
+                <Ionicons 
+                  name={dashboardSummary?.budgetRemaining < 0 ? 'warning' : 'wallet'} 
+                  size={18} 
+                  color={dashboardSummary?.budgetRemaining < 0 ? '#DC2626' : '#059669'} 
+                />
+              </View>
+              <Text style={[styles.summaryCardValue, { color: dashboardSummary?.budgetRemaining < 0 ? '#DC2626' : '#059669' }]}>
+                {dashboardSummary ? `${currencySymbol}${Math.abs(dashboardSummary.budgetRemaining).toLocaleString('en-IN')}` : '—'}
+              </Text>
+              <Text style={styles.summaryCardLabel}>
+                {dashboardSummary?.budgetRemaining < 0 ? 'Over Budget' : 'Budget Left'}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Most Recent Transaction Mini Card */}
+        {dashboardSummary?.recentTransaction && (
+          <Animated.View entering={FadeInDown.springify().delay(490)} style={styles.recentMiniCard}>
+            <View style={styles.recentMiniIconBg}>
+              <Ionicons name="flash" size={16} color="#7C3AED" />
+            </View>
+            <View style={styles.recentMiniInfo}>
+              <Text style={styles.recentMiniTitle}>Latest Transaction</Text>
+              <Text style={styles.recentMiniSub} numberOfLines={1}>
+                {dashboardSummary.recentTransaction.title} • {dashboardSummary.recentTransaction.category}
+              </Text>
+            </View>
+            <Text style={styles.recentMiniAmount}>
+              -{currencySymbol}{Math.abs(dashboardSummary.recentTransaction.amount).toLocaleString('en-IN')}
+            </Text>
+          </Animated.View>
+        )}
+
         {/* Pending */}
         <Animated.View entering={FadeInDown.springify().delay(500)} style={styles.pendingCard}>
           <View style={styles.pendingHeader}>
@@ -180,13 +269,19 @@ export default function DashboardScreen({ navigation }) {
               <Ionicons name="alert" size={20} color="#fff" />
             </View>
             <View style={styles.pendingBadge}>
-              <Text style={styles.pendingBadgeText}>3 Pending</Text>
+              <Text style={styles.pendingBadgeText}>
+                {dashboardSummary?.pendingCount ?? 0} Pending
+              </Text>
             </View>
           </View>
           <View style={styles.pendingRow}>
             <View>
               <Text style={styles.pendingTitle}>Confirm Actions</Text>
-              <Text style={styles.pendingSub}>Review flagged items</Text>
+              <Text style={styles.pendingSub}>
+                {dashboardSummary?.pendingCount > 0
+                  ? `${dashboardSummary.pendingCount} items need your review`
+                  : 'No pending items'}
+              </Text>
             </View>
             <TouchableOpacity 
               style={styles.pendingBtn}
@@ -205,7 +300,7 @@ export default function DashboardScreen({ navigation }) {
             </View>
             <View>
               <Text style={styles.statLabel}>TODAY'S TOTAL SPENDINGS</Text>
-              <Text style={styles.statValue}>₹ {todaySpending.toFixed(2)}</Text>
+              <Text style={styles.statValue}>{currencySymbol} {todaySpending.toFixed(2)}</Text>
             </View>
           </View>
         </View>
@@ -217,7 +312,7 @@ export default function DashboardScreen({ navigation }) {
             </View>
             <View>
               <Text style={styles.statLabel}>WEEKLY SPENDING</Text>
-              <Text style={styles.statValue}>₹ {weeklySpending.toFixed(2)}</Text>
+              <Text style={styles.statValue}>{currencySymbol} {weeklySpending.toFixed(2)}</Text>
             </View>
           </View>
         </View>
@@ -265,6 +360,8 @@ export default function DashboardScreen({ navigation }) {
                   category={tx.category}
                   date={new Date(tx.date).toLocaleDateString()}
                   amount={tx.amount}
+                  onRefresh={fetchExpenses}
+                  showActions={false}
                 />
               </Animated.View>
             ))
@@ -294,6 +391,38 @@ const styles = StyleSheet.create({
   trendContainer: { flexDirection: 'row', alignItems: 'center' },
   trendText: { color: 'rgba(255,255,255,0.9)', fontSize: 12, marginLeft: 6 },
   circleDecoration: { position: 'absolute', width: 250, height: 250, borderRadius: 125, backgroundColor: 'rgba(255,255,255,0.05)', right: -80, top: -40 },
+
+  // Dynamic Summary Section
+  summarySection: { marginBottom: 20 },
+  summarySectionTitle: { fontSize: 16, fontWeight: 'bold', color: colors.textMain, marginBottom: 12 },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  summaryCard: {
+    width: (screenWidth - 58) / 2,
+    borderRadius: 20,
+    padding: 16,
+    minHeight: 120,
+  },
+  summaryIconBg: {
+    width: 36, height: 36, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 10,
+  },
+  summaryCardValue: { fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  summaryCardLabel: { fontSize: 11, fontWeight: '600', color: colors.textSub },
+
+  // Recent Mini Card
+  recentMiniCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FAF5FF', borderRadius: 16, padding: 14,
+    marginBottom: 20, borderWidth: 1, borderColor: '#EDE9FE',
+  },
+  recentMiniIconBg: {
+    width: 36, height: 36, borderRadius: 12, backgroundColor: '#EDE9FE',
+    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+  },
+  recentMiniInfo: { flex: 1 },
+  recentMiniTitle: { fontSize: 10, fontWeight: '700', color: '#7C3AED', letterSpacing: 0.5, marginBottom: 2 },
+  recentMiniSub: { fontSize: 13, fontWeight: '600', color: colors.textMain },
+  recentMiniAmount: { fontSize: 15, fontWeight: '800', color: '#DC2626' },
 
   pendingCard: { backgroundColor: '#FFF5F5', borderRadius: 24, padding: 20, marginBottom: 20 },
   pendingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },

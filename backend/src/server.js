@@ -8,6 +8,8 @@ const authRoutes = require('./routes/authRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const pendingRoutes = require('./routes/pendingRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const userRoutes = require('./routes/userRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 // Load env vars
 dotenv.config();
@@ -26,6 +28,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/pending', pendingRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

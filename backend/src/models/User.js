@@ -5,6 +5,13 @@ const userSchema = mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  preferences: {
+    theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+    currency: { type: String, default: 'INR' },
+    notifications: { type: Boolean, default: true },
+    budgetAlerts: { type: Boolean, default: true },
+    monthlyBudget: { type: Number, default: 5000 },
+  },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

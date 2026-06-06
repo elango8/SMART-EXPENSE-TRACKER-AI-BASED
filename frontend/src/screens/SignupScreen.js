@@ -46,61 +46,57 @@ export default function SignupScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{flex: 1}}>
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <Animated.View entering={FadeInDown.springify().delay(100)} style={s.header}>
-          <Animated.View style={logoAnimStyle}>
-            <Animated.View entering={ZoomIn.springify().delay(150)}>
-              <View style={s.logoGlow}>
-                <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
-              </View>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Animated.View entering={FadeInDown.springify().delay(100)} style={s.header}>
+            <Animated.View style={logoAnimStyle}>
+              <Animated.View entering={ZoomIn.springify().delay(150)}>
+                <View style={s.logoGlow}>
+                  <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
+                </View>
+              </Animated.View>
             </Animated.View>
-          </Animated.View>
-          <Animated.Text entering={FadeInDown.springify().delay(250)} style={s.title}>Create Account</Animated.Text>
-          <Animated.Text entering={FadeInDown.springify().delay(350)} style={s.subtitle}>Start your journey towards effortless financial intelligence.</Animated.Text>
-        </Animated.View>
-
-        <View style={s.form}>
-          <Animated.View entering={FadeInDown.springify().delay(400)}>
-            <CustomInput label="Full Name" icon="person-outline" placeholder="Enter your name" value={name} onChangeText={setName} autoCapitalize="words" />
-          </Animated.View>
-          <Animated.View entering={FadeInDown.springify().delay(500)}>
-            <CustomInput label="Email Address" icon="mail-outline" placeholder="name@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-          </Animated.View>
-          <Animated.View entering={FadeInDown.springify().delay(600)}>
-            <CustomInput label="Password" icon="lock-closed-outline" placeholder="••••••••" secureTextEntry={!showPassword} rightIcon={showPassword ? "eye-off-outline" : "eye-outline"} onRightIconPress={() => setShowPassword(!showPassword)} value={password} onChangeText={setPassword} />
-          </Animated.View>
-          <Animated.View entering={FadeInDown.springify().delay(700)}>
-            <CustomInput label="Confirm Password" icon="shield-checkmark-outline" placeholder="••••••••" secureTextEntry={!showConfirmPassword} rightIcon={showConfirmPassword ? "eye-off-outline" : "eye-outline"} onRightIconPress={() => setShowConfirmPassword(!showConfirmPassword)} value={confirmPassword} onChangeText={setConfirmPassword} />
+            <Animated.Text entering={FadeInDown.springify().delay(250)} style={s.title}>Create Account</Animated.Text>
+            <Animated.Text entering={FadeInDown.springify().delay(350)} style={s.subtitle}>Start your journey towards effortless financial intelligence.</Animated.Text>
           </Animated.View>
 
-          <View style={s.spacer} />
+          <View style={s.form}>
+            <Animated.View entering={FadeInDown.springify().delay(400)}>
+              <CustomInput label="Full Name" icon="person-outline" placeholder="Enter your name" value={name} onChangeText={setName} autoCapitalize="words" />
+            </Animated.View>
+            <Animated.View entering={FadeInDown.springify().delay(500)}>
+              <CustomInput label="Email Address" icon="mail-outline" placeholder="name@example.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+            </Animated.View>
+            <Animated.View entering={FadeInDown.springify().delay(600)}>
+              <CustomInput label="Password" icon="lock-closed-outline" placeholder="••••••••" secureTextEntry={!showPassword} rightIcon={showPassword ? "eye-off-outline" : "eye-outline"} onRightIconPress={() => setShowPassword(!showPassword)} value={password} onChangeText={setPassword} />
+            </Animated.View>
+            <Animated.View entering={FadeInDown.springify().delay(700)}>
+              <CustomInput label="Confirm Password" icon="shield-checkmark-outline" placeholder="••••••••" secureTextEntry={!showConfirmPassword} rightIcon={showConfirmPassword ? "eye-off-outline" : "eye-outline"} onRightIconPress={() => setShowConfirmPassword(!showConfirmPassword)} value={confirmPassword} onChangeText={setConfirmPassword} />
+            </Animated.View>
 
-          <Animated.View entering={FadeInUp.springify().delay(800)}>
-            <CustomButton title="Sign Up" onPress={handleSignup} loading={loading} />
+            <View style={s.spacer} />
+
+            <Animated.View entering={FadeInUp.springify().delay(800)}>
+              <CustomButton title="Sign Up" onPress={handleSignup} loading={loading} />
+            </Animated.View>
+
+            <Animated.View entering={FadeIn.delay(900)} style={s.dividerContainer}>
+              <View style={s.line} /><Text style={s.dividerText}>OR SIGN UP WITH</Text><View style={s.line} />
+            </Animated.View>
+
+            <Animated.View entering={FadeInUp.springify().delay(1000)} style={s.socialContainer}>
+              <TouchableOpacity style={s.socialBtn} activeOpacity={0.7}>
+                <Ionicons name="logo-google" size={24} color="#DB4437" />
+                <Text style={s.socialText}>Google</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+
+          <Animated.View entering={FadeIn.delay(1100)} style={s.footer}>
+            <Text style={s.footerText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}><Text style={s.footerLink}>Login</Text></TouchableOpacity>
           </Animated.View>
-
-          <Animated.View entering={FadeIn.delay(900)} style={s.dividerContainer}>
-            <View style={s.line} /><Text style={s.dividerText}>OR SIGN UP WITH</Text><View style={s.line} />
-          </Animated.View>
-
-          <Animated.View entering={FadeInUp.springify().delay(1000)} style={s.socialContainer}>
-            <TouchableOpacity style={s.socialBtn} activeOpacity={0.7}>
-              <Ionicons name="logo-google" size={24} color="#DB4437" />
-              <Text style={s.socialText}>Google</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.socialBtn} activeOpacity={0.7}>
-              <Ionicons name="logo-apple" size={24} color="#000" />
-              <Text style={s.socialText}>Apple</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-
-        <Animated.View entering={FadeIn.delay(1100)} style={s.footer}>
-          <Text style={s.footerText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}><Text style={s.footerLink}>Login</Text></TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

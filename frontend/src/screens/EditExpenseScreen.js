@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView, Platform, KeyboardAvoidingView, Modal, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
@@ -16,6 +16,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors } from '../theme/colors';
 import api from '../services/api';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -34,6 +36,112 @@ const ACCOUNTS = [
   { key: 'Credit Card', icon: 'card', color: '#EF4444', bgColor: '#FEF2F2' },
   { key: 'UPI', icon: 'phone-portrait', color: '#8B5CF6', bgColor: '#F5F3FF' },
 ];
+
+// ─── Dropdown Selector Component ─────────────────────────────
+function DropdownSelector({ items, selected, onSelect, label, icon, iconBgColor, iconColor }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedItem = items.find(i => i.key === selected);
+
+  return (
+    <>
+      {/* Dropdown Trigger */}
+      <TouchableOpacity
+        style={styles.dropdownTrigger}
+        onPress={() => setIsOpen(true)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.dropdownTriggerLeft}>
+          {selectedItem && (
+            <View style={[styles.dropdownSelectedIcon, { backgroundColor: selectedItem.bgColor }]}>
+              <Ionicons name={selectedItem.icon} size={18} color={selectedItem.color} />
+            </View>
+          )}
+          <View style={styles.dropdownTriggerTextWrap}>
+            <Text style={styles.dropdownTriggerLabel}>{label}</Text>
+            <Text style={styles.dropdownTriggerValue}>{selectedItem?.key || 'Select'}</Text>
+          </View>
+        </View>
+        <View style={styles.dropdownChevronWrap}>
+          <Ionicons name="chevron-down" size={18} color="#94A3B8" />
+        </View>
+      </TouchableOpacity>
+
+      {/* Dropdown Modal */}
+      <Modal
+        visible={isOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsOpen(false)}
+        >
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={[styles.modalHeaderIcon, { backgroundColor: iconBgColor || '#EEF2FF' }]}>
+                <Ionicons name={icon || 'list'} size={18} color={iconColor || '#6366F1'} />
+              </View>
+              <Text style={styles.modalTitle}>Select {label}</Text>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setIsOpen(false)}
+              >
+                <Ionicons name="close" size={20} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Divider */}
+            <View style={styles.modalDivider} />
+
+            {/* Options */}
+            <ScrollView
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              {items.map((item, index) => {
+                const isSelected = selected === item.key;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[
+                      styles.modalOption,
+                      isSelected && styles.modalOptionSelected,
+                      index === items.length - 1 && { borderBottomWidth: 0 },
+                    ]}
+                    onPress={() => {
+                      onSelect(item.key);
+                      setIsOpen(false);
+                    }}
+                    activeOpacity={0.6}
+                  >
+                    <View style={[styles.modalOptionIcon, { backgroundColor: isSelected ? item.color + '20' : item.bgColor }]}>
+                      <Ionicons name={item.icon} size={20} color={item.color} />
+                    </View>
+                    <Text style={[
+                      styles.modalOptionText,
+                      isSelected && { color: item.color, fontWeight: '800' },
+                    ]}>
+                      {item.key}
+                    </Text>
+                    {isSelected && (
+                      <View style={[styles.modalCheckCircle, { backgroundColor: item.color }]}>
+                        <Ionicons name="checkmark" size={14} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
+  );
+}
 
 export default function EditExpenseScreen({ route, navigation }) {
   const { expense } = route.params || {};
@@ -145,13 +253,13 @@ export default function EditExpenseScreen({ route, navigation }) {
             <View style={{ width: 40 }} />
           </Animated.View>
 
-          {/* Amount Card */}
+          {/* Amount Card (Compact) */}
           <Animated.View entering={FadeInDown.springify().delay(120)} style={styles.amountCard}>
             <View style={styles.amountCircle1} />
             <View style={styles.amountCircle2} />
 
             <Animated.View entering={ZoomIn.springify().delay(250)} style={styles.amountIconInner}>
-              <Ionicons name="create" size={24} color="#fff" />
+              <Ionicons name="create" size={22} color="#fff" />
             </Animated.View>
 
             <Text style={styles.amountLabel}>AMOUNT</Text>
@@ -190,7 +298,7 @@ export default function EditExpenseScreen({ route, navigation }) {
             </View>
           </Animated.View>
 
-          {/* Category Selector */}
+          {/* Category Dropdown */}
           <Animated.View entering={FadeInDown.springify().delay(300)} style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
               <View style={[styles.sectionIcon, { backgroundColor: selectedCat?.bgColor || '#F3F4F6' }]}>
@@ -198,32 +306,18 @@ export default function EditExpenseScreen({ route, navigation }) {
               </View>
               <Text style={styles.sectionTitle}>Category</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {CATEGORIES.map((item, index) => {
-                const isSelected = category === item.key;
-                return (
-                  <Animated.View key={item.key} entering={SlideInRight.springify().delay(index * 60)}>
-                    <TouchableOpacity
-                      style={[
-                        styles.chip,
-                        isSelected && { backgroundColor: item.color, borderColor: item.color },
-                        !isSelected && { backgroundColor: item.bgColor, borderColor: item.bgColor },
-                      ]}
-                      onPress={() => setCategory(item.key)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name={item.icon} size={16} color={isSelected ? '#fff' : item.color} style={{ marginRight: 6 }} />
-                      <Text style={[styles.chipText, { color: isSelected ? '#fff' : item.color }]} numberOfLines={1}>
-                        {item.key.split(' & ')[0]}
-                      </Text>
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              })}
-            </ScrollView>
+            <DropdownSelector
+              items={CATEGORIES}
+              selected={category}
+              onSelect={setCategory}
+              label="Category"
+              icon="pricetag"
+              iconBgColor={selectedCat?.bgColor}
+              iconColor={selectedCat?.color}
+            />
           </Animated.View>
 
-          {/* Account Selector */}
+          {/* Payment Method Dropdown */}
           <Animated.View entering={FadeInDown.springify().delay(400)} style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
               <View style={[styles.sectionIcon, { backgroundColor: '#EFF6FF' }]}>
@@ -231,29 +325,15 @@ export default function EditExpenseScreen({ route, navigation }) {
               </View>
               <Text style={styles.sectionTitle}>Payment Method</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {ACCOUNTS.map((item, index) => {
-                const isSelected = account === item.key;
-                return (
-                  <Animated.View key={item.key} entering={SlideInRight.springify().delay(index * 60)}>
-                    <TouchableOpacity
-                      style={[
-                        styles.chip,
-                        isSelected && { backgroundColor: item.color, borderColor: item.color },
-                        !isSelected && { backgroundColor: item.bgColor, borderColor: item.bgColor },
-                      ]}
-                      onPress={() => setAccount(item.key)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name={item.icon} size={16} color={isSelected ? '#fff' : item.color} style={{ marginRight: 6 }} />
-                      <Text style={[styles.chipText, { color: isSelected ? '#fff' : item.color }]} numberOfLines={1}>
-                        {item.key}
-                      </Text>
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              })}
-            </ScrollView>
+            <DropdownSelector
+              items={ACCOUNTS}
+              selected={account}
+              onSelect={setAccount}
+              label="Payment Method"
+              icon="card"
+              iconBgColor="#EFF6FF"
+              iconColor="#3B82F6"
+            />
           </Animated.View>
 
           {/* Update Button */}
@@ -311,20 +391,21 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textMain, letterSpacing: 0.3 },
 
+  // ── Amount Card (Compact) ──
   amountCard: {
-    borderRadius: 28, paddingVertical: 32, paddingHorizontal: 24, marginBottom: 28, alignItems: 'center', overflow: 'hidden',
+    borderRadius: 24, paddingVertical: 22, paddingHorizontal: 24, marginBottom: 24, alignItems: 'center', overflow: 'hidden',
     backgroundColor: '#6366F1',
-    shadowColor: '#6366F1', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.35, shadowRadius: 24, elevation: 12,
+    shadowColor: '#6366F1', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10,
   },
   amountCircle1: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.06)', right: -60, top: -40 },
   amountCircle2: { position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.04)', left: -40, bottom: -30 },
   amountIconInner: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 10,
   },
-  amountLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.6)', letterSpacing: 2, marginBottom: 10 },
-  amountInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%' },
-  currencySymbol: { fontSize: 36, fontWeight: '800', color: '#fff', marginRight: 4 },
-  amountInput: { fontSize: 44, fontWeight: '800', color: '#fff', flex: 1, maxWidth: 200, paddingVertical: 4, textAlign: 'center' },
+  amountLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.6)', letterSpacing: 2, marginBottom: 8 },
+  amountInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 50 },
+  currencySymbol: { fontSize: 32, fontWeight: '800', color: '#fff', marginRight: 4 },
+  amountInput: { fontSize: 40, fontWeight: '800', color: '#fff', flex: 1, maxWidth: 200, paddingVertical: 2, textAlign: 'center' },
 
   sectionWrap: { marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
@@ -338,9 +419,148 @@ const styles = StyleSheet.create({
   },
   textInput: { fontSize: 15, color: colors.textMain, lineHeight: 22 },
 
-  chipRow: { flexDirection: 'row', gap: 8, paddingRight: 20 },
-  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, borderWidth: 1.5 },
-  chipText: { fontSize: 13, fontWeight: '700' },
+  // ── Dropdown Trigger ──
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#F0F1F3',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  dropdownTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dropdownSelectedIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  dropdownTriggerTextWrap: {
+    flex: 1,
+  },
+  dropdownTriggerLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  dropdownTriggerValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textMain,
+  },
+  dropdownChevronWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Modal ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    maxHeight: SCREEN_HEIGHT * 0.55,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  modalHeaderIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.textMain,
+    flex: 1,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginHorizontal: 20,
+    marginBottom: 8,
+  },
+  modalScroll: {
+    paddingHorizontal: 20,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  modalOptionSelected: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    marginHorizontal: -8,
+    paddingHorizontal: 8,
+  },
+  modalOptionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  modalOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textMain,
+    flex: 1,
+  },
+  modalCheckCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   updateBtn: {
     borderRadius: 22, overflow: 'hidden', marginBottom: 14,

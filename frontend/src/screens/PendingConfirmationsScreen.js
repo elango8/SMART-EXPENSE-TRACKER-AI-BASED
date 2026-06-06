@@ -1,47 +1,130 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useCallback, useContext } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeInDown, FadeInRight, FadeInUp, ZoomIn, SlideOutRight } from 'react-native-reanimated';
 import { colors } from '../theme/colors';
+import { AuthContext } from '../context/AuthContext';
+import api from '../services/api';
+
+// Category icon mapping
+const categoryIcons = {
+  'Dining & Drinks': { icon: 'cafe-outline', bg: '#E3F2FD' },
+  'Food & Dining': { icon: 'restaurant-outline', bg: '#FFF3E0' },
+  'Utilities': { icon: 'flash-outline', bg: '#E0F7FA' },
+  'Apparel': { icon: 'shirt-outline', bg: '#FCE4EC' },
+  'Shopping & Retail': { icon: 'bag-outline', bg: '#F3E5F5' },
+  'Transport': { icon: 'car-outline', bg: '#E8F5E9' },
+  'Entertainment': { icon: 'game-controller-outline', bg: '#FFF8E1' },
+  'Bills': { icon: 'receipt-outline', bg: '#E3F2FD' },
+  'Tech': { icon: 'laptop-outline', bg: '#EDE7F6' },
+  'Other': { icon: 'ellipsis-horizontal-outline', bg: '#F5F5F5' },
+};
+
+const getCategoryStyle = (category) => {
+  return categoryIcons[category] || { icon: 'pricetag-outline', bg: '#F5F5F5' };
+};
 
 export default function PendingConfirmationsScreen({ navigation }) {
-  const [pending, setPending] = useState([
-    { id: '1', title: 'Blue Bottle Coffee', category: 'Drinks', date: 'Today, 08:45 AM', amount: 300, confidence: 92, icon: 'cafe-outline', bg: '#E3F2FD' },
-    { id: '2', title: 'Consolidated Edison', category: 'Utilities', date: 'Yesterday, 02:30 PM', amount: 3423, confidence: 98, icon: 'flash-outline', bg: '#E0F7FA' },
-    { id: '3', title: 'Flipkart', category: 'Apparel', date: 'Nov 12, 06:12 PM', amount: 325, confidence: 74, icon: 'shirt-outline', bg: '#FCE4EC' },
-  ]);
+  const { user } = useContext(AuthContext);
+  const [pending, setPending] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actioningId, setActioningId] = useState(null);
 
-  const confirmAction = (id) => {
-    setPending(pending.filter(item => item.id !== id));
+  // Fetch pending transactions from backend
+  const fetchPending = async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get('/pending');
+      setPending(res.data);
+    } catch (error) {
+      console.log('Error fetching pending:', error);
+      Alert.alert('Error', 'Failed to load pending transactions');
+    } finally {
+      setIsLoading(false);
+    }
   };
-  const rejectAction = (id) => {
-    setPending(pending.filter(item => item.id !== id));
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user?._id) {
+        fetchPending();
+      }
+    }, [user])
+  );
+
+  // Confirm a pending transaction via API
+  const confirmAction = async (id) => {
+    try {
+      setActioningId(id);
+      await api.post(`/pending/${id}/confirm`);
+      setPending(prev => prev.filter(item => item._id !== id));
+      Alert.alert('✅ Confirmed', 'Transaction has been confirmed and added to your expenses.');
+    } catch (error) {
+      console.log('Confirm error:', error);
+      Alert.alert('Error', 'Failed to confirm transaction');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  // Reject a pending transaction via API
+  const rejectAction = async (id) => {
+    Alert.alert(
+      'Reject Transaction',
+      'Are you sure you want to reject this transaction?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setActioningId(id);
+              await api.post(`/pending/${id}/reject`);
+              setPending(prev => prev.filter(item => item._id !== id));
+            } catch (error) {
+              console.log('Reject error:', error);
+              Alert.alert('Error', 'Failed to reject transaction');
+            } finally {
+              setActioningId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderCard = (item, index) => {
-    const isHighConfidence = item.confidence >= 90;
+    const isHighConfidence = item.confidenceScore >= 90;
+    const catStyle = getCategoryStyle(item.category);
+    const isActioning = actioningId === item._id;
+    const formattedDate = new Date(item.date).toLocaleDateString('en-IN', {
+      month: 'short', day: 'numeric', year: 'numeric',
+    });
+
     return (
       <Animated.View
-        key={item.id}
+        key={item._id}
         entering={FadeInRight.springify().delay(300 + index * 120)}
         exiting={SlideOutRight.springify()}
       >
-        <View style={styles.card}>
+        <View style={[styles.card, isActioning && { opacity: 0.5 }]}>
           <View style={styles.cardHeader}>
             <Animated.View entering={ZoomIn.springify().delay(350 + index * 120)}>
-              <View style={[styles.iconContainer, { backgroundColor: item.bg }]}>
-                <Ionicons name={item.icon} size={24} color={colors.primary} />
+              <View style={[styles.iconContainer, { backgroundColor: catStyle.bg }]}>
+                <Ionicons name={catStyle.icon} size={24} color={colors.primary} />
               </View>
             </Animated.View>
             <View style={styles.details}>
-              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.title}>{item.merchant}</Text>
               <View style={styles.dateRow}>
                 <Ionicons name="time-outline" size={12} color={colors.textSub} style={{ marginRight: 4 }} />
-                <Text style={styles.subtitle}>{item.date}</Text>
+                <Text style={styles.subtitle}>{formattedDate}</Text>
               </View>
             </View>
-            <Text style={styles.amount}>- ₹{item.amount}</Text>
+            <Text style={styles.amount}>- ₹{item.amount.toLocaleString('en-IN')}</Text>
           </View>
 
           <View style={styles.predictionRow}>
@@ -52,20 +135,36 @@ export default function PendingConfirmationsScreen({ navigation }) {
             <Text style={styles.categoryText}>{item.category}</Text>
             <View style={styles.confidenceBadge}>
               <View style={[styles.dot, { backgroundColor: isHighConfidence ? colors.success : colors.warning }]} />
-              <Text style={styles.confidenceText}>{item.confidence}% confidence</Text>
+              <Text style={styles.confidenceText}>{item.confidenceScore}% confidence</Text>
             </View>
           </View>
 
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.confirmBtn} onPress={() => confirmAction(item.id)} activeOpacity={0.8}>
-              <Ionicons name="checkmark" size={16} color="#fff" style={{ marginRight: 6 }} />
-              <Text style={styles.confirmText}>Confirm</Text>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={() => confirmAction(item._id)}
+              activeOpacity={0.8}
+              disabled={isActioning}
+            >
+              {isActioning ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.confirmText}>Confirm</Text>
+                </>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.editBtn} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.editBtn} activeOpacity={0.8} disabled={isActioning}>
               <Ionicons name="create-outline" size={16} color={colors.textMain} style={{ marginRight: 6 }} />
               <Text style={styles.editText}>Edit</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.rejectBtn} onPress={() => rejectAction(item.id)} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.rejectBtn}
+              onPress={() => rejectAction(item._id)}
+              activeOpacity={0.8}
+              disabled={isActioning}
+            >
               <Ionicons name="close" size={20} color={colors.danger} />
             </TouchableOpacity>
           </View>
@@ -93,22 +192,36 @@ export default function PendingConfirmationsScreen({ navigation }) {
           <View style={styles.bannerGlow} />
           <Text style={styles.bannerLabel}>INTELLIGENCE SUMMARY</Text>
           <Text style={styles.bannerTitle}>{pending.length} Pending Actions</Text>
-          <Text style={styles.bannerDesc}>We've identified {pending.length} new transactions that match your recurring patterns. Verify them to update your budget.</Text>
+          <Text style={styles.bannerDesc}>
+            {pending.length > 0
+              ? `We've identified ${pending.length} new transactions that match your recurring patterns. Verify them to update your budget.`
+              : 'All transactions have been reviewed. No pending items.'
+            }
+          </Text>
           <Ionicons name="sparkles" size={80} color="rgba(255,255,255,0.15)" style={styles.sparkle} />
         </Animated.View>
 
-        {pending.map((item, idx) => renderCard(item, idx))}
-        
-        {pending.length === 0 && (
-          <Animated.View entering={FadeInUp.springify()} style={styles.emptyState}>
-            <Animated.View entering={ZoomIn.springify()}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="checkmark-done-circle" size={48} color="#10B981" />
-              </View>
-            </Animated.View>
-            <Text style={styles.emptyTitle}>All caught up!</Text>
-            <Text style={styles.emptyDesc}>No pending transactions to review.</Text>
-          </Animated.View>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading pending transactions...</Text>
+          </View>
+        ) : (
+          <>
+            {pending.map((item, idx) => renderCard(item, idx))}
+            
+            {pending.length === 0 && (
+              <Animated.View entering={FadeInUp.springify()} style={styles.emptyState}>
+                <Animated.View entering={ZoomIn.springify()}>
+                  <View style={styles.emptyIcon}>
+                    <Ionicons name="checkmark-done-circle" size={48} color="#10B981" />
+                  </View>
+                </Animated.View>
+                <Text style={styles.emptyTitle}>All caught up!</Text>
+                <Text style={styles.emptyDesc}>No pending transactions to review.</Text>
+              </Animated.View>
+            )}
+          </>
         )}
 
         <View style={{ height: 100 }} />
@@ -142,6 +255,10 @@ const styles = StyleSheet.create({
   bannerTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginBottom: 10 },
   bannerDesc: { fontSize: 13, color: '#C7D2FE', lineHeight: 20, maxWidth: '90%' },
   sparkle: { position: 'absolute', right: 10, top: 70 },
+
+  // Loading
+  loadingContainer: { alignItems: 'center', paddingVertical: 60 },
+  loadingText: { fontSize: 14, color: colors.textSub, marginTop: 12 },
 
   card: {
     backgroundColor: '#fff', borderRadius: 22, padding: 20, marginBottom: 16,
