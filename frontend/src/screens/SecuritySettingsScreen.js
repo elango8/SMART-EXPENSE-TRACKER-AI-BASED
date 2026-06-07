@@ -14,7 +14,7 @@ export default function SecuritySettingsScreen({ navigation }) {
     { icon: 'keypad', label: '2-Step Verification', sub: 'Extra layer of security', type: 'switch', value: twoFactor, onToggle: setTwoFactor, color: '#8B5CF6', bgColor: '#F5F3FF' },
     { icon: 'lock-closed', label: 'Change Password', sub: null, type: 'nav', color: '#10B981', bgColor: '#ECFDF5' },
   ];
-
+ // settings preference page
   return (
     <SafeAreaView style={s.safeArea}>
       <Animated.View entering={FadeInDown.springify().delay(50)} style={s.header}>
