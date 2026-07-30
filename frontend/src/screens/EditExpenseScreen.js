@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
   withSequence,
 } from 'react-native-reanimated';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -39,6 +39,7 @@ const ACCOUNTS = [
 
 // ─── Dropdown Selector Component ─────────────────────────────
 function DropdownSelector({ items, selected, onSelect, label, icon, iconBgColor, iconColor }) {
+  const { colors, isDark } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const selectedItem = items.find(i => i.key === selected);
 
@@ -46,23 +47,23 @@ function DropdownSelector({ items, selected, onSelect, label, icon, iconBgColor,
     <>
       {/* Dropdown Trigger */}
       <TouchableOpacity
-        style={styles.dropdownTrigger}
+        style={[styles.dropdownTrigger, { backgroundColor: colors.surface, borderColor: colors.border }]}
         onPress={() => setIsOpen(true)}
         activeOpacity={0.7}
       >
         <View style={styles.dropdownTriggerLeft}>
           {selectedItem && (
-            <View style={[styles.dropdownSelectedIcon, { backgroundColor: selectedItem.bgColor }]}>
+            <View style={[styles.dropdownSelectedIcon, { backgroundColor: isDark ? selectedItem.color + '20' : selectedItem.bgColor }]}>
               <Ionicons name={selectedItem.icon} size={18} color={selectedItem.color} />
             </View>
           )}
           <View style={styles.dropdownTriggerTextWrap}>
-            <Text style={styles.dropdownTriggerLabel}>{label}</Text>
-            <Text style={styles.dropdownTriggerValue}>{selectedItem?.key || 'Select'}</Text>
+            <Text style={[styles.dropdownTriggerLabel, { color: colors.textSub }]}>{label}</Text>
+            <Text style={[styles.dropdownTriggerValue, { color: colors.textMain }]}>{selectedItem?.key || 'Select'}</Text>
           </View>
         </View>
-        <View style={styles.dropdownChevronWrap}>
-          <Ionicons name="chevron-down" size={18} color="#94A3B8" />
+        <View style={[styles.dropdownChevronWrap, { backgroundColor: isDark ? colors.inputBg : '#F8FAFC' }]}>
+          <Ionicons name="chevron-down" size={18} color={colors.textSub} />
         </View>
       </TouchableOpacity>
 
@@ -78,23 +79,23 @@ function DropdownSelector({ items, selected, onSelect, label, icon, iconBgColor,
           activeOpacity={1}
           onPress={() => setIsOpen(false)}
         >
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <View style={[styles.modalHeaderIcon, { backgroundColor: iconBgColor || '#EEF2FF' }]}>
-                <Ionicons name={icon || 'list'} size={18} color={iconColor || '#6366F1'} />
+              <View style={[styles.modalHeaderIcon, { backgroundColor: isDark ? colors.primary + '20' : (iconBgColor || '#EEF2FF') }]}>
+                <Ionicons name={icon || 'list'} size={18} color={iconColor || colors.primary} />
               </View>
-              <Text style={styles.modalTitle}>Select {label}</Text>
+              <Text style={[styles.modalTitle, { color: colors.textMain }]}>Select {label}</Text>
               <TouchableOpacity
-                style={styles.modalCloseBtn}
+                style={[styles.modalCloseBtn, { backgroundColor: isDark ? colors.inputBg : '#F1F5F9' }]}
                 onPress={() => setIsOpen(false)}
               >
-                <Ionicons name="close" size={20} color="#94A3B8" />
+                <Ionicons name="close" size={20} color={colors.textSub} />
               </TouchableOpacity>
             </View>
 
             {/* Divider */}
-            <View style={styles.modalDivider} />
+            <View style={[styles.modalDivider, { backgroundColor: colors.border }]} />
 
             {/* Options */}
             <ScrollView
@@ -109,7 +110,8 @@ function DropdownSelector({ items, selected, onSelect, label, icon, iconBgColor,
                     key={item.key}
                     style={[
                       styles.modalOption,
-                      isSelected && styles.modalOptionSelected,
+                      { borderBottomColor: colors.border },
+                      isSelected && [styles.modalOptionSelected, { backgroundColor: isDark ? colors.inputBg : '#F8FAFC' }],
                       index === items.length - 1 && { borderBottomWidth: 0 },
                     ]}
                     onPress={() => {
@@ -118,11 +120,12 @@ function DropdownSelector({ items, selected, onSelect, label, icon, iconBgColor,
                     }}
                     activeOpacity={0.6}
                   >
-                    <View style={[styles.modalOptionIcon, { backgroundColor: isSelected ? item.color + '20' : item.bgColor }]}>
+                    <View style={[styles.modalOptionIcon, { backgroundColor: isSelected ? item.color + '20' : (isDark ? item.color + '15' : item.bgColor) }]}>
                       <Ionicons name={item.icon} size={20} color={item.color} />
                     </View>
                     <Text style={[
                       styles.modalOptionText,
+                      { color: colors.textMain },
                       isSelected && { color: item.color, fontWeight: '800' },
                     ]}>
                       {item.key}
@@ -145,6 +148,7 @@ function DropdownSelector({ items, selected, onSelect, label, icon, iconBgColor,
 
 export default function EditExpenseScreen({ route, navigation }) {
   const { expense } = route.params || {};
+  const { colors, isDark } = useTheme();
 
   const [title, setTitle] = useState(expense?.title || '');
   const [amount, setAmount] = useState(expense?.amount ? String(expense.amount) : '');
@@ -237,7 +241,7 @@ export default function EditExpenseScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -246,10 +250,10 @@ export default function EditExpenseScreen({ route, navigation }) {
 
           {/* Header */}
           <Animated.View entering={FadeInDown.springify().delay(50)} style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.surface }]} onPress={() => navigation.goBack()} activeOpacity={0.7}>
               <Ionicons name="arrow-back" size={22} color={colors.textMain} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Edit Expense</Text>
+            <Text style={[styles.headerTitle, { color: colors.textMain }]}>Edit Expense</Text>
             <View style={{ width: 40 }} />
           </Animated.View>
 
@@ -282,18 +286,18 @@ export default function EditExpenseScreen({ route, navigation }) {
           {/* Title */}
           <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: '#F3E8FF' }]}>
+              <View style={[styles.sectionIcon, { backgroundColor: isDark ? '#A855F720' : '#F3E8FF' }]}>
                 <Ionicons name="create" size={16} color="#A855F7" />
               </View>
-              <Text style={styles.sectionTitle}>Title</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textMain }]}>Title</Text>
             </View>
-            <View style={styles.inputWrap}>
+            <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: colors.textMain }]}
                 value={title}
                 onChangeText={setTitle}
                 placeholder="What was this expense for?"
-                placeholderTextColor="#B0B8C4"
+                placeholderTextColor={isDark ? '#666' : '#B0B8C4'}
               />
             </View>
           </Animated.View>
@@ -301,10 +305,10 @@ export default function EditExpenseScreen({ route, navigation }) {
           {/* Category Dropdown */}
           <Animated.View entering={FadeInDown.springify().delay(300)} style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: selectedCat?.bgColor || '#F3F4F6' }]}>
+              <View style={[styles.sectionIcon, { backgroundColor: isDark ? (selectedCat?.color + '20') : (selectedCat?.bgColor || '#F3F4F6') }]}>
                 <Ionicons name="pricetag" size={16} color={selectedCat?.color || colors.primary} />
               </View>
-              <Text style={styles.sectionTitle}>Category</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textMain }]}>Category</Text>
             </View>
             <DropdownSelector
               items={CATEGORIES}
@@ -312,7 +316,7 @@ export default function EditExpenseScreen({ route, navigation }) {
               onSelect={setCategory}
               label="Category"
               icon="pricetag"
-              iconBgColor={selectedCat?.bgColor}
+              iconBgColor={isDark ? selectedCat?.color + '20' : selectedCat?.bgColor}
               iconColor={selectedCat?.color}
             />
           </Animated.View>
@@ -320,10 +324,10 @@ export default function EditExpenseScreen({ route, navigation }) {
           {/* Payment Method Dropdown */}
           <Animated.View entering={FadeInDown.springify().delay(400)} style={styles.sectionWrap}>
             <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: '#EFF6FF' }]}>
+              <View style={[styles.sectionIcon, { backgroundColor: isDark ? '#3B82F620' : '#EFF6FF' }]}>
                 <Ionicons name="card" size={16} color="#3B82F6" />
               </View>
-              <Text style={styles.sectionTitle}>Payment Method</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textMain }]}>Payment Method</Text>
             </View>
             <DropdownSelector
               items={ACCOUNTS}
@@ -331,7 +335,7 @@ export default function EditExpenseScreen({ route, navigation }) {
               onSelect={setAccount}
               label="Payment Method"
               icon="card"
-              iconBgColor="#EFF6FF"
+              iconBgColor={isDark ? '#3B82F620' : '#EFF6FF'}
               iconColor="#3B82F6"
             />
           </Animated.View>
@@ -361,7 +365,7 @@ export default function EditExpenseScreen({ route, navigation }) {
           {/* Delete Button */}
           <Animated.View entering={FadeIn.delay(600)}>
             <AnimatedTouchable
-              style={[styles.deleteBtn, deleteBtnAnimStyle]}
+              style={[styles.deleteBtn, deleteBtnAnimStyle, { backgroundColor: isDark ? '#2D1518' : '#FEF2F2', borderColor: isDark ? '#4D2528' : '#FECACA' }]}
               onPress={handleDelete}
               disabled={isLoading}
               activeOpacity={0.85}
@@ -379,7 +383,7 @@ export default function EditExpenseScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: { flex: 1 },
   container: { paddingHorizontal: 20, paddingBottom: 60 },
 
   header: {
@@ -389,7 +393,7 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textMain, letterSpacing: 0.3 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1A1C1E', letterSpacing: 0.3 },
 
   // ── Amount Card (Compact) ──
   amountCard: {
@@ -410,14 +414,14 @@ const styles = StyleSheet.create({
   sectionWrap: { marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   sectionIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textMain, flex: 1 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#1A1C1E', flex: 1 },
 
   inputWrap: {
     backgroundColor: '#fff', borderRadius: 20, padding: 18, minHeight: 56,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2,
     borderWidth: 1, borderColor: '#F0F1F3',
   },
-  textInput: { fontSize: 15, color: colors.textMain, lineHeight: 22 },
+  textInput: { fontSize: 15, color: '#1A1C1E', lineHeight: 22 },
 
   // ── Dropdown Trigger ──
   dropdownTrigger: {
@@ -465,7 +469,7 @@ const styles = StyleSheet.create({
   dropdownTriggerValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.textMain,
+    color: '#1A1C1E',
   },
   dropdownChevronWrap: {
     width: 32,
@@ -507,7 +511,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: colors.textMain,
+    color: '#1A1C1E',
     flex: 1,
   },
   modalCloseBtn: {
@@ -551,7 +555,7 @@ const styles = StyleSheet.create({
   modalOptionText: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.textMain,
+    color: '#1A1C1E',
     flex: 1,
   },
   modalCheckCircle: {

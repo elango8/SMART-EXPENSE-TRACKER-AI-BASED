@@ -1,16 +1,19 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function CustomButton({ title, onPress, type = 'primary', loading = false, rightIcon }) {
+  const { colors, isDark } = useTheme();
   const isPrimary = type === 'primary';
   
   return (
     <TouchableOpacity 
       style={[
         styles.button, 
-        isPrimary ? styles.primaryBtn : styles.secondaryBtn
+        isPrimary 
+          ? [styles.primaryBtn, { backgroundColor: colors.primary, shadowColor: colors.primary }]
+          : [styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border }]
       ]} 
       onPress={onPress}
       disabled={loading}
@@ -21,7 +24,7 @@ export default function CustomButton({ title, onPress, type = 'primary', loading
         <>
           <Text style={[
             styles.text, 
-            isPrimary ? styles.primaryText : styles.secondaryText
+            isPrimary ? styles.primaryText : [styles.secondaryText, { color: colors.textMain }]
           ]}>
             {title}
           </Text>
@@ -40,19 +43,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     width: '100%',
-    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
   },
-  primaryBtn: {
-    backgroundColor: colors.primary,
-  },
+  primaryBtn: {},
   secondaryBtn: {
-    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     elevation: 1,
@@ -63,7 +61,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   secondaryText: {
-    color: colors.textMain,
     fontSize: 16,
     fontWeight: '600',
   },

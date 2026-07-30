@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lightColors, darkColors } from '../theme/colors';
 import { AuthContext } from './AuthContext';
 import api from '../services/api';
@@ -8,8 +9,29 @@ const ThemeContext = createContext();
 export const ThemeProvider = ({ children }) => {
   const { user, updatePreferences } = useContext(AuthContext);
 
-  // Initialize from user preferences (persisted in DB)
-  const [isDark, setIsDark] = useState(user?.preferences?.theme === 'dark');
+  // Initialize from user preferences (persisted in DB/AsyncStorage)
+  const [isDark, setIsDark] = useState(false);
+  const [isThemeLoading, setIsThemeLoading] = useState(true);
+
+  // Read theme from AsyncStorage on mount for anti-flicker
+  useEffect(() => {
+    const loadStoredTheme = async () => {
+      try {
+        const userInfo = await AsyncStorage.getItem('userInfo');
+        if (userInfo) {
+          const parsed = JSON.parse(userInfo);
+          if (parsed?.preferences?.theme) {
+            setIsDark(parsed.preferences.theme === 'dark');
+          }
+        }
+      } catch (error) {
+        console.log('Error reading stored theme:', error);
+      } finally {
+        setIsThemeLoading(false);
+      }
+    };
+    loadStoredTheme();
+  }, []);
 
   // Sync when user data loads/changes (e.g., after login)
   useEffect(() => {
@@ -22,19 +44,19 @@ export const ThemeProvider = ({ children }) => {
 
   const toggleTheme = useCallback(async (value) => {
     const newIsDark = typeof value === 'boolean' ? value : !isDark;
-    const prevIsDark = isDark;
-    
-    // Optimistic UI update
+    const themeValue = newIsDark ? 'dark' : 'light';
+
+    // 1. Apply immediately to UI
     setIsDark(newIsDark);
 
+    // 2. Persist locally first (so it works even without server)
+    updatePreferences({ theme: themeValue });
+
+    // 3. Sync to server in background (non-blocking, no rollback)
     try {
-      const themeValue = newIsDark ? 'dark' : 'light';
       await api.put('/user/preferences', { theme: themeValue });
-      updatePreferences({ theme: themeValue });
     } catch (error) {
-      console.log('Error saving theme preference:', error);
-      // Rollback on failure
-      setIsDark(prevIsDark);
+      console.log('Theme synced locally, server sync failed (will retry on next save):', error?.message);
     }
   }, [isDark, updatePreferences]);
 
@@ -44,6 +66,7 @@ export const ThemeProvider = ({ children }) => {
         isDark,
         colors: currentColors,
         toggleTheme,
+        isThemeLoading,
       }}
     >
       {children}

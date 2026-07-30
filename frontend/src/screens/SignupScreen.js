@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
 import { AuthContext } from '../context/AuthContext';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   FadeInDown, FadeInUp, FadeIn, ZoomIn,
@@ -14,6 +14,7 @@ import api from '../services/api';
 
 export default function SignupScreen({ navigation }) {
   const { login } = useContext(AuthContext);
+  const { colors, isDark } = useTheme();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,19 +46,19 @@ export default function SignupScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={[s.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <Animated.View entering={FadeInDown.springify().delay(100)} style={s.header}>
             <Animated.View style={logoAnimStyle}>
               <Animated.View entering={ZoomIn.springify().delay(150)}>
-                <View style={s.logoGlow}>
+                <View style={[s.logoGlow, { backgroundColor: colors.surface }]}>
                   <Image source={require('../../assets/logo.png')} style={s.logoImage} resizeMode="contain" />
                 </View>
               </Animated.View>
             </Animated.View>
-            <Animated.Text entering={FadeInDown.springify().delay(250)} style={s.title}>Create Account</Animated.Text>
-            <Animated.Text entering={FadeInDown.springify().delay(350)} style={s.subtitle}>Start your journey towards effortless financial intelligence.</Animated.Text>
+            <Animated.Text entering={FadeInDown.springify().delay(250)} style={[s.title, { color: colors.textMain }]}>Create Account</Animated.Text>
+            <Animated.Text entering={FadeInDown.springify().delay(350)} style={[s.subtitle, { color: colors.textSub }]}>Start your journey towards effortless financial intelligence.</Animated.Text>
           </Animated.View>
 
           <View style={s.form}>
@@ -81,20 +82,20 @@ export default function SignupScreen({ navigation }) {
             </Animated.View>
 
             <Animated.View entering={FadeIn.delay(900)} style={s.dividerContainer}>
-              <View style={s.line} /><Text style={s.dividerText}>OR SIGN UP WITH</Text><View style={s.line} />
+              <View style={[s.line, { backgroundColor: colors.border }]} /><Text style={[s.dividerText, { color: colors.textSub }]}>OR SIGN UP WITH</Text><View style={[s.line, { backgroundColor: colors.border }]} />
             </Animated.View>
 
             <Animated.View entering={FadeInUp.springify().delay(1000)} style={s.socialContainer}>
-              <TouchableOpacity style={s.socialBtn} activeOpacity={0.7}>
+              <TouchableOpacity style={[s.socialBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} activeOpacity={0.7}>
                 <Ionicons name="logo-google" size={24} color="#DB4437" />
-                <Text style={s.socialText}>Google</Text>
+                <Text style={[s.socialText, { color: colors.textMain }]}>Google</Text>
               </TouchableOpacity>
             </Animated.View>
           </View>
 
           <Animated.View entering={FadeIn.delay(1100)} style={s.footer}>
-            <Text style={s.footerText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}><Text style={s.footerLink}>Login</Text></TouchableOpacity>
+            <Text style={[s.footerText, { color: colors.textSub }]}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}><Text style={[s.footerLink, { color: colors.primary }]}>Login</Text></TouchableOpacity>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -103,22 +104,22 @@ export default function SignupScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1 },
   scroll: { flexGrow: 1, padding: 24, justifyContent: 'center' },
   header: { alignItems: 'center', marginBottom: 30, marginTop: 20 },
-  logoGlow: { width: 76, height: 76, borderRadius: 24, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#0B63F6', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 6, marginBottom: 16 },
+  logoGlow: { width: 76, height: 76, borderRadius: 24, alignItems: 'center', justifyContent: 'center', shadowColor: '#0B63F6', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 6, marginBottom: 16 },
   logoImage: { width: 50, height: 50 },
-  title: { fontSize: 28, fontWeight: 'bold', color: colors.textMain, marginBottom: 8 },
-  subtitle: { fontSize: 13, color: colors.textSub, textAlign: 'center', paddingHorizontal: 20, lineHeight: 20 },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 8 },
+  subtitle: { fontSize: 13, textAlign: 'center', paddingHorizontal: 20, lineHeight: 20 },
   form: { width: '100%' },
   spacer: { height: 10 },
   dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 30 },
-  line: { flex: 1, height: 1, backgroundColor: colors.border },
-  dividerText: { marginHorizontal: 10, color: colors.textSub, fontSize: 11, fontWeight: 'bold' },
+  line: { flex: 1, height: 1 },
+  dividerText: { marginHorizontal: 10, fontSize: 11, fontWeight: 'bold' },
   socialContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  socialBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 56, borderRadius: 20, borderWidth: 1.5, borderColor: '#E8E9EB', backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  socialText: { marginLeft: 10, fontWeight: 'bold', color: colors.textMain },
+  socialBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 56, borderRadius: 20, borderWidth: 1.5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  socialText: { marginLeft: 10, fontWeight: 'bold' },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 30 },
-  footerText: { color: colors.textSub },
-  footerLink: { color: colors.primary, fontWeight: 'bold' }
+  footerText: {},
+  footerLink: { fontWeight: 'bold' }
 });

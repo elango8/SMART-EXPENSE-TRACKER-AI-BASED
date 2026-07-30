@@ -1,4 +1,4 @@
-import React, { useState, useContext, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useContext, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Image,
   ActivityIndicator,
   Dimensions,
+  Alert,
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +18,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
   FadeInDown,
   FadeInRight,
-  FadeInUp,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
@@ -27,10 +27,11 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-import Svg, { Circle, G, Path, Defs, LinearGradient, Stop, RadialGradient } from 'react-native-svg';
+import Svg, { Circle, Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
+import { usePreferences } from '../context/PreferencesContext';
 import api from '../services/api';
 
 const screenWidth = Dimensions.get('window').width;
@@ -38,7 +39,9 @@ const screenWidth = Dimensions.get('window').width;
 /* ──────────────────────────────────────
    ANIMATED BAR COMPONENT
    ────────────────────────────────────── */
-const AnimatedBar = ({ targetHeight, delay, label, value, isActive, color, maxH }) => {
+const AnimatedBar = React.memo(({ targetHeight, delay, label, value, isActive, color, maxH }) => {
+  const { colors, isDark } = useTheme();
+  const { formatAmount, getSymbol } = usePreferences();
   const height = useSharedValue(0);
   const opacity = useSharedValue(0);
 
@@ -56,28 +59,43 @@ const AnimatedBar = ({ targetHeight, delay, label, value, isActive, color, maxH 
     opacity: opacity.value,
   }));
 
+  const formattedValue = (() => {
+    const symbol = getSymbol();
+    if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `${symbol}${(value / 1000).toFixed(1)}k`;
+    return `${symbol}${Math.round(value)}`;
+  })();
+
+  const handlePress = () => {
+    Alert.alert(label, `Exact Spending: ${formatAmount(value)}`);
+  };
+
   return (
     <View style={styles.barGroup}>
       <Animated.View style={animatedLabelStyle}>
-        <Text style={styles.barValue}>
-          {value > 0 ? `₹${Math.round(value)}` : ''}
+        <Text style={[styles.barValue, { color: colors.textSub }]} numberOfLines={1}>
+          {value > 0 ? formattedValue : ''}
         </Text>
       </Animated.View>
-      <View style={[styles.barTrack, { height: maxH }]}>  
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={handlePress}
+        style={[styles.barTrack, { height: maxH, backgroundColor: isDark ? '#252535' : '#F3F4F6' }]}
+      >
         <Animated.View
           style={[
             styles.barFill,
-            { backgroundColor: color || (isActive ? colors.primary : '#E0E7FF') },
+            { backgroundColor: color || (isActive ? colors.primary : (isDark ? '#2D2D3D' : '#E0E7FF')) },
             animatedBarStyle,
           ]}
         />
-      </View>
-      <Text style={[styles.barLabel, isActive && styles.barLabelActive]}>
+      </TouchableOpacity>
+      <Text style={[styles.barLabel, { color: colors.textSub }, isActive && [styles.barLabelActive, { color: colors.primary }]]}>
         {label}
       </Text>
     </View>
   );
-};
+});
 
 /* ──────────────────────────────────────
    ANIMATED PIE SEGMENT
@@ -119,7 +137,7 @@ const AnimatedPieSegment = ({ d, color, delay, isSelected, onPress }) => {
 };
 
 /* ──────────────────────────────────────
-   PREMIUM PIE CHART
+   PREMIUM PIE CHART PATH HELPER
    ────────────────────────────────────── */
 const createPieSlicePath = (cx, cy, radius, startAngle, endAngle, innerRadius) => {
   const toRad = (deg) => (deg * Math.PI) / 180;
@@ -142,6 +160,8 @@ const createPieSlicePath = (cx, cy, radius, startAngle, endAngle, innerRadius) =
 };
 
 const DonutChart = ({ data, totalSpent }) => {
+  const { colors, isDark } = useTheme();
+  const { formatAmount } = usePreferences();
   const size = PIE_SIZE;
   const cx = size / 2;
   const cy = size / 2;
@@ -166,8 +186,8 @@ const DonutChart = ({ data, totalSpent }) => {
   if (!data || data.length === 0) {
     return (
       <View style={styles.donutEmpty}>
-        <Ionicons name="pie-chart-outline" size={48} color="#D1D5DB" />
-        <Text style={styles.emptyText}>No expense data yet</Text>
+        <Ionicons name="pie-chart-outline" size={48} color={isDark ? '#3D3D4D' : '#D1D5DB'} />
+        <Text style={[styles.emptyText, { color: colors.textSub }]}>No expense data yet</Text>
       </View>
     );
   }
@@ -208,21 +228,21 @@ const DonutChart = ({ data, totalSpent }) => {
 
       {/* Center overlay */}
       <Animated.View style={[styles.donutCenter, centerAnimStyle]}>
-        <View style={styles.centerGlassCard}>
+        <View style={[styles.centerGlassCard, { backgroundColor: isDark ? 'rgba(30,30,42,0.95)' : 'rgba(255,255,255,0.92)', borderColor: colors.border }]}>
           {selected ? (
             <>
               <View style={[styles.centerCategoryDot, { backgroundColor: selected.color }]} />
-              <Text style={styles.centerCategoryName}>{selected.name}</Text>
-              <Text style={styles.donutTotal}>₹{selected.amount.toFixed(0)}</Text>
-              <Text style={styles.donutLabel}>{selected.percentage}% OF TOTAL</Text>
+              <Text style={[styles.centerCategoryName, { color: colors.primary }]} numberOfLines={1}>{selected.name}</Text>
+              <Text style={[styles.donutTotal, { color: colors.textMain }]}>{formatAmount(selected.amount)}</Text>
+              <Text style={[styles.donutLabel, { color: colors.textSub }]}>{selected.percentage}% OF TOTAL</Text>
             </>
           ) : (
             <>
-              <View style={styles.centerIconRing}>
-                <Ionicons name="wallet" size={20} color="#6366F1" />
+              <View style={[styles.centerIconRing, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF' }]}>
+                <Ionicons name="wallet" size={20} color={colors.primary} />
               </View>
-              <Text style={styles.donutTotal}>₹{totalSpent.toFixed(0)}</Text>
-              <Text style={styles.donutLabel}>TOTAL SPENT</Text>
+              <Text style={[styles.donutTotal, { color: colors.textMain }]}>{formatAmount(totalSpent)}</Text>
+              <Text style={[styles.donutLabel, { color: colors.textSub }]}>TOTAL SPENT</Text>
             </>
           )}
         </View>
@@ -236,6 +256,8 @@ const DonutChart = ({ data, totalSpent }) => {
    ────────────────────────────────────── */
 export default function AnalyticsScreen({ navigation }) {
   const { user } = useContext(AuthContext);
+  const { colors, isDark } = useTheme();
+  const { formatAmount, getSymbol } = usePreferences();
 
   const [expenses, setExpenses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -328,19 +350,59 @@ export default function AnalyticsScreen({ navigation }) {
     ? (totalSpent / (selectedPeriod === 'Week' ? 7 : selectedPeriod === 'Month' ? 30 : selectedPeriod === '3M' ? 90 : Math.max(1, Math.ceil((now - new Date(Math.min(...expenses.map(e => new Date(e.date))))) / 86400000)))).toFixed(0)
     : 0;
 
+  // Calculate weekly trends (last 4 weeks)
+  const weeklyTrends = (() => {
+    const trends = [];
+    const todayMs = now.getTime();
+    for (let i = 3; i >= 0; i--) {
+      const start = new Date(todayMs - (i + 1) * 7 * 24 * 60 * 60 * 1000);
+      const end = new Date(todayMs - i * 7 * 24 * 60 * 60 * 1000);
+      const amount = expenses
+        .filter(e => {
+          const d = new Date(e.date);
+          return d >= start && d < end;
+        })
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+      trends.push({ label: `W-${i}`, amount, weekNum: 4 - i });
+    }
+    return trends;
+  })();
+
+  const maxWeeklyAmount = Math.max(...weeklyTrends.map(t => t.amount), 1);
+  const chartWidth = screenWidth - 80;
+  const chartHeight = 80;
+  const paddingX = 20;
+  const paddingY = 15;
+  
+  const points = weeklyTrends.map((t, idx) => {
+    const x = paddingX + (idx / (weeklyTrends.length - 1)) * (chartWidth - 2 * paddingX);
+    const y = chartHeight - paddingY - (t.amount / maxWeeklyAmount) * (chartHeight - 2 * paddingY);
+    return { x, y, ...t };
+  });
+
+  const pathD = points.reduce((acc, p, idx) => {
+    return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+  }, '');
+
+  const areaD = points.length > 0 
+    ? `${pathD} L ${points[points.length - 1].x} ${chartHeight - paddingY} L ${points[0].x} ${chartHeight - paddingY} Z`
+    : '';
+
+
+
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Analyzing your finances...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSub }]}>Analyzing your finances...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
         {/* HEADER */}
@@ -351,7 +413,7 @@ export default function AnalyticsScreen({ navigation }) {
               style={styles.logoImage}
               resizeMode="contain"
             />
-            <Text style={styles.logoText}>Finovo</Text>
+            <Text style={[styles.logoText, { color: colors.primary }]}>Finovo</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
             <Ionicons name="notifications-outline" size={24} color={colors.primary} />
@@ -359,7 +421,7 @@ export default function AnalyticsScreen({ navigation }) {
         </View>
 
         {/* AI BANNER */}
-        <Animated.View entering={FadeInDown.springify().delay(100)} style={styles.banner}>
+        <Animated.View entering={FadeInDown.springify().delay(100)} style={[styles.banner, { backgroundColor: '#1E1B4B' }]}>
           <View style={styles.bannerGlow} />
           <Text style={styles.bannerLabel}>
             <Ionicons name="sparkles" size={12} /> INTELLIGENCE PULSE
@@ -375,14 +437,14 @@ export default function AnalyticsScreen({ navigation }) {
         </Animated.View>
 
         {/* PERIOD FILTER */}
-        <Animated.View entering={FadeInDown.springify().delay(150)} style={styles.periodRow}>
+        <Animated.View entering={FadeInDown.springify().delay(150)} style={[styles.periodRow, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
           {periods.map((p) => (
             <TouchableOpacity
               key={p}
-              style={[styles.periodBtn, selectedPeriod === p && styles.periodBtnActive]}
+              style={[styles.periodBtn, selectedPeriod === p && [styles.periodBtnActive, { backgroundColor: colors.primary }]]}
               onPress={() => setSelectedPeriod(p)}
             >
-              <Text style={[styles.periodText, selectedPeriod === p && styles.periodTextActive]}>
+              <Text style={[styles.periodText, { color: colors.textSub }, selectedPeriod === p && [styles.periodTextActive, { color: '#FFFFFF' }]]}>
                 {p}
               </Text>
             </TouchableOpacity>
@@ -391,38 +453,38 @@ export default function AnalyticsScreen({ navigation }) {
 
         {/* SUMMARY CARDS */}
         <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.summaryRow}>
-          <View style={[styles.summaryCard, { backgroundColor: '#EEF2FF' }]}>  
-            <View style={[styles.summaryIcon, { backgroundColor: '#C7D2FE' }]}>
-              <Ionicons name="wallet" size={18} color="#6366F1" />
+          <View style={[styles.summaryCard, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF' }]}>  
+            <View style={[styles.summaryIcon, { backgroundColor: isDark ? '#2D3560' : '#C7D2FE' }]}>
+              <Ionicons name="wallet" size={18} color={isDark ? '#818CF8' : '#6366F1'} />
             </View>
-            <Text style={styles.summaryAmount}>₹{totalSpent.toFixed(0)}</Text>
-            <Text style={styles.summaryLabel}>Total Spent</Text>
+            <Text style={[styles.summaryAmount, { color: isDark ? '#818CF8' : '#6366F1' }]}>{formatAmount(totalSpent)}</Text>
+            <Text style={[styles.summaryLabel, { color: isDark ? '#9CA3AF' : '#6366F1' }]}>Total Spent</Text>
           </View>
-          <View style={[styles.summaryCard, { backgroundColor: '#FEF3C7' }]}>
-            <View style={[styles.summaryIcon, { backgroundColor: '#FDE68A' }]}>
-              <Ionicons name="trending-up" size={18} color="#D97706" />
+          <View style={[styles.summaryCard, { backgroundColor: isDark ? '#2D1F0E' : '#FEF3C7' }]}>
+            <View style={[styles.summaryIcon, { backgroundColor: isDark ? '#4D3520' : '#FDE68A' }]}>
+              <Ionicons name="trending-up" size={18} color={isDark ? '#FBBF24' : '#D97706'} />
             </View>
-            <Text style={styles.summaryAmount}>₹{avgDaily}</Text>
-            <Text style={styles.summaryLabel}>Avg / Day</Text>
+            <Text style={[styles.summaryAmount, { color: isDark ? '#FBBF24' : '#D97706' }]}>{formatAmount(avgDaily)}</Text>
+            <Text style={[styles.summaryLabel, { color: isDark ? '#9CA3AF' : '#D97706' }]}>Avg / Day</Text>
           </View>
-          <View style={[styles.summaryCard, { backgroundColor: '#D1FAE5' }]}>
-            <View style={[styles.summaryIcon, { backgroundColor: '#A7F3D0' }]}>
-              <Ionicons name="receipt" size={18} color="#059669" />
+          <View style={[styles.summaryCard, { backgroundColor: isDark ? '#0D2818' : '#D1FAE5' }]}>
+            <View style={[styles.summaryIcon, { backgroundColor: isDark ? '#1A3D25' : '#A7F3D0' }]}>
+              <Ionicons name="receipt" size={18} color={isDark ? '#34D399' : '#059669'} />
             </View>
-            <Text style={styles.summaryAmount}>{filteredExpenses.length}</Text>
-            <Text style={styles.summaryLabel}>Transactions</Text>
+            <Text style={[styles.summaryAmount, { color: isDark ? '#34D399' : '#059669' }]}>{filteredExpenses.length}</Text>
+            <Text style={[styles.summaryLabel, { color: isDark ? '#9CA3AF' : '#059669' }]}>Transactions</Text>
           </View>
         </Animated.View>
 
         {/* DONUT CHART CARD */}
-        <Animated.View entering={FadeInDown.springify().delay(300)} style={styles.card}>
+        <Animated.View entering={FadeInDown.springify().delay(300)} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Category Breakdown</Text>
-            <View style={styles.cardBadge}>
-              <Ionicons name="pie-chart" size={14} color="#6366F1" />
+            <Text style={[styles.cardTitle, { color: colors.textMain }]}>Category Breakdown</Text>
+            <View style={[styles.cardBadge, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF' }]}>
+              <Ionicons name="pie-chart" size={14} color={colors.primary} />
             </View>
           </View>
-          <Text style={styles.cardSub}>Where your money flows</Text>
+          <Text style={[styles.cardSub, { color: colors.textSub }]}>Where your money flows</Text>
 
           <DonutChart data={categoryData} totalSpent={totalSpent} />
 
@@ -435,8 +497,8 @@ export default function AnalyticsScreen({ navigation }) {
                 style={styles.legendRow}
               >
                 <View style={[styles.legendDot, { backgroundColor: cat.color }]} />
-                <Text style={styles.legendText}>{cat.name}</Text>
-                <Text style={styles.legendAmount}>₹{cat.amount.toFixed(0)}</Text>
+                <Text style={[styles.legendText, { color: colors.textSub }]}>{cat.name}</Text>
+                <Text style={[styles.legendAmount, { color: colors.textMain }]}>{formatAmount(cat.amount)}</Text>
                 <View style={[styles.legendBadge, { backgroundColor: cat.color + '20' }]}>
                   <Text style={[styles.legendPercent, { color: cat.color }]}>{cat.percentage}%</Text>
                 </View>
@@ -445,15 +507,15 @@ export default function AnalyticsScreen({ navigation }) {
           </View>
         </Animated.View>
 
-        {/* BAR CHART CARD */}
-        <Animated.View entering={FadeInDown.springify().delay(500)} style={styles.card}>
+        {/* MONTHLY TRENDS BAR CHART CARD */}
+        <Animated.View entering={FadeInDown.springify().delay(450)} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Monthly Trends</Text>
-            <View style={styles.cardBadge}>
-              <Ionicons name="bar-chart" size={14} color="#6366F1" />
+            <Text style={[styles.cardTitle, { color: colors.textMain }]}>Monthly Trends</Text>
+            <View style={[styles.cardBadge, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF' }]}>
+              <Ionicons name="bar-chart" size={14} color={colors.primary} />
             </View>
           </View>
-          <Text style={styles.cardSub}>Last 6 months overview</Text>
+          <Text style={[styles.cardSub, { color: colors.textSub }]}>Last 6 months overview (Tap bars for details)</Text>
 
           <View style={styles.barChartContainer}>
             {monthlyTotals.map((value, index) => {
@@ -467,7 +529,7 @@ export default function AnalyticsScreen({ navigation }) {
                   label={last6Months[index].label}
                   value={value}
                   isActive={isCurrentMonth}
-                  color={isCurrentMonth ? '#6366F1' : '#E0E7FF'}
+                  color={isCurrentMonth ? colors.primary : (isDark ? '#2D2D3D' : '#E0E7FF')}
                   maxH={barMaxH + 8}
                 />
               );
@@ -475,20 +537,114 @@ export default function AnalyticsScreen({ navigation }) {
           </View>
         </Animated.View>
 
+        {/* WEEKLY TRENDS LINE CHART */}
+        {weeklyTrends.length > 0 && maxWeeklyAmount > 0 && (
+          <Animated.View entering={FadeInDown.springify().delay(500)} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
+            <View style={styles.cardHeader}>
+              <Text style={[styles.cardTitle, { color: colors.textMain }]}>Weekly Spending Trends</Text>
+              <View style={[styles.cardBadge, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF' }]}>
+                <Ionicons name="trending-up" size={14} color={colors.primary} />
+              </View>
+            </View>
+            <Text style={[styles.cardSub, { color: colors.textSub }]}>Overview of last 4 weeks</Text>
+
+            <View style={{ height: 125, justifyContent: 'center', marginTop: 10 }}>
+              <Svg width={chartWidth} height={chartHeight}>
+                <Defs>
+                  <LinearGradient id="weeklyGrad" x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0%" stopColor={colors.primary} stopOpacity={0.35} />
+                    <Stop offset="100%" stopColor={colors.primary} stopOpacity={0} />
+                  </LinearGradient>
+                </Defs>
+                
+                {/* Reference Grid */}
+                <Path d={`M ${paddingX} ${paddingY} L ${chartWidth - paddingX} ${paddingY}`} stroke={isDark ? '#2A2A38' : '#F1F5F9'} strokeWidth={1} strokeDasharray="4 4" />
+                <Path d={`M ${paddingX} ${chartHeight / 2} L ${chartWidth - paddingX} ${chartHeight / 2}`} stroke={isDark ? '#2A2A38' : '#F1F5F9'} strokeWidth={1} strokeDasharray="4 4" />
+                <Path d={`M ${paddingX} ${chartHeight - paddingY} L ${chartWidth - paddingX} ${chartHeight - paddingY}`} stroke={isDark ? '#2A2A38' : '#F1F5F9'} strokeWidth={1} />
+
+                {/* Filled Area */}
+                {areaD ? <Path d={areaD} fill="url(#weeklyGrad)" /> : null}
+
+                {/* Path line */}
+                {pathD ? <Path d={pathD} fill="none" stroke={colors.primary} strokeWidth={3} /> : null}
+
+                {/* Data Points */}
+                {points.map((p, idx) => (
+                  <Circle key={idx} cx={p.x} cy={p.y} r={4.5} fill={colors.primary} stroke="#fff" strokeWidth={1.5} />
+                ))}
+              </Svg>
+              {/* Labels below */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: paddingX - 10, marginTop: 8 }}>
+                {weeklyTrends.map((t, idx) => (
+                  <TouchableOpacity key={idx} onPress={() => Alert.alert(`Week ${t.weekNum}`, `Total Spending: ${formatAmount(t.amount)}`)}>
+                    <Text style={{ fontSize: 10, color: colors.textSub, textAlign: 'center', fontWeight: '600' }}>
+                      Week {t.weekNum}
+                    </Text>
+                    <Text style={{ fontSize: 9, color: colors.textMain, textAlign: 'center', fontWeight: 'bold' }}>
+                      {t.amount > 0 ? formatAmount(t.amount) : '—'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* TOP CATEGORIES RANKED LIST */}
+        {categoryData.length > 0 && (
+          <Animated.View entering={FadeInDown.springify().delay(600)} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
+            <View style={styles.cardHeader}>
+              <Text style={[styles.cardTitle, { color: colors.textMain }]}>Top Categories Ranked</Text>
+              <View style={[styles.cardBadge, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF' }]}>
+                <Ionicons name="list" size={14} color={colors.primary} />
+              </View>
+            </View>
+            <Text style={[styles.cardSub, { color: colors.textSub }]}>Ranked by expenditure share</Text>
+            
+            <View style={{ gap: 14 }}>
+              {categoryData.slice(0, 5).map((cat, idx) => {
+                const maxCatAmount = categoryData[0]?.amount || 1;
+                const relativePercent = Math.round((cat.amount / maxCatAmount) * 100);
+                return (
+                  <View key={cat.name}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 13, color: colors.textMain, fontWeight: '700' }}>
+                          {idx + 1}. {cat.name}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.textSub, fontWeight: '500' }}>
+                          ({cat.percentage}%)
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 13, color: colors.textMain, fontWeight: 'bold' }}>
+                        {formatAmount(cat.amount)}
+                      </Text>
+                    </View>
+                    <View style={{ height: 6, backgroundColor: isDark ? '#2D2D3D' : '#E5E7EB', borderRadius: 3, overflow: 'hidden' }}>
+                      <View style={{ width: `${relativePercent}%`, height: '100%', backgroundColor: cat.color, borderRadius: 3 }} />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </Animated.View>
+        )}
+
+
         {/* SMART INSIGHTS */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Smart Insights</Text>
-          <Text style={styles.viewAllBtn}>View All</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textMain }]}>Smart Insights</Text>
+          <Text style={[styles.viewAllBtn, { color: colors.primary }]}>View All</Text>
         </View>
 
         {topCategory && (
-          <Animated.View entering={FadeInDown.springify().delay(700)} style={styles.insightCard}>
-            <View style={[styles.insightIconBg, { backgroundColor: '#FEE2E2' }]}>
+          <Animated.View entering={FadeInDown.springify().delay(700)} style={[styles.insightCard, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
+            <View style={[styles.insightIconBg, { backgroundColor: isDark ? '#2D1518' : '#FEE2E2' }]}>
               <Ionicons name="flame" size={22} color="#EF4444" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.insightTitle}>Top Spending Category</Text>
-              <Text style={styles.insightDesc}>
+              <Text style={[styles.insightTitle, { color: colors.textMain }]}>Top Spending Category</Text>
+              <Text style={[styles.insightDesc, { color: colors.textSub }]}>
                 <Text style={{ fontWeight: '700', color: colors.textMain }}>{topCategory.name}</Text> accounts for{' '}
                 <Text style={{ fontWeight: '700', color: topCategory.color }}>{topCategory.percentage}%</Text> of your total expenses.
               </Text>
@@ -496,26 +652,26 @@ export default function AnalyticsScreen({ navigation }) {
           </Animated.View>
         )}
 
-        <Animated.View entering={FadeInDown.springify().delay(800)} style={styles.insightCard}>
-          <View style={[styles.insightIconBg, { backgroundColor: '#DBEAFE' }]}>
+        <Animated.View entering={FadeInDown.springify().delay(800)} style={[styles.insightCard, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
+          <View style={[styles.insightIconBg, { backgroundColor: isDark ? '#1E2340' : '#DBEAFE' }]}>
             <Ionicons name="analytics" size={22} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.insightTitle}>Expense Tracker</Text>
-            <Text style={styles.insightDesc}>
+            <Text style={[styles.insightTitle, { color: colors.textMain }]}>Expense Tracker</Text>
+            <Text style={[styles.insightDesc, { color: colors.textSub }]}>
               You've tracked <Text style={{ fontWeight: '700', color: colors.textMain }}>{expenses.length} transactions</Text> so far. Keep going!
             </Text>
           </View>
         </Animated.View>
 
         {monthlyTotals[5] > monthlyTotals[4] && monthlyTotals[4] > 0 && (
-          <Animated.View entering={FadeInDown.springify().delay(900)} style={styles.insightCard}>
-            <View style={[styles.insightIconBg, { backgroundColor: '#FEF3C7' }]}>
+          <Animated.View entering={FadeInDown.springify().delay(900)} style={[styles.insightCard, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: isDark ? 1 : 0 }]}>
+            <View style={[styles.insightIconBg, { backgroundColor: isDark ? '#2D1F0E' : '#FEF3C7' }]}>
               <Ionicons name="warning" size={22} color="#D97706" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.insightTitle}>Spending Alert</Text>
-              <Text style={styles.insightDesc}>
+              <Text style={[styles.insightTitle, { color: colors.textMain }]}>Spending Alert</Text>
+              <Text style={[styles.insightDesc, { color: colors.textSub }]}>
                 This month's spending is{' '}
                 <Text style={{ fontWeight: '700', color: '#D97706' }}>
                   {Math.round(((monthlyTotals[5] - monthlyTotals[4]) / monthlyTotals[4]) * 100)}% higher
@@ -538,7 +694,6 @@ export default function AnalyticsScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   container: {
     padding: 20,
@@ -552,7 +707,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 14,
-    color: colors.textSub,
   },
 
   // Header
@@ -606,7 +760,6 @@ const styles = StyleSheet.create({
   // Period Filter
   periodRow: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 4,
     marginBottom: 20,
@@ -622,17 +775,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 12,
   },
-  periodBtnActive: {
-    backgroundColor: '#6366F1',
-  },
+  periodBtnActive: {},
   periodText: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.textSub,
   },
-  periodTextActive: {
-    color: '#FFFFFF',
-  },
+  periodTextActive: {},
 
   // Summary Cards
   summaryRow: {
@@ -656,22 +804,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   summaryAmount: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: colors.textMain,
     marginBottom: 2,
+    textAlign: 'center',
   },
   summaryLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: colors.textSub,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
 
   // Cards
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
     marginBottom: 20,
@@ -680,6 +827,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
+    borderWidth: 1,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -690,19 +838,16 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.textMain,
   },
   cardBadge: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardSub: {
     fontSize: 13,
-    color: colors.textSub,
     marginBottom: 20,
   },
 
@@ -728,25 +873,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   centerGlassCard: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
     borderRadius: 999,
     width: PIE_SIZE * 0.55 - 12,
     height: PIE_SIZE * 0.55 - 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6366F1',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 6,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.1)',
   },
   centerIconRing: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
@@ -758,22 +899,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   centerCategoryName: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#6366F1',
     marginBottom: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    paddingHorizontal: 8,
+    textAlign: 'center',
   },
   donutTotal: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: 'bold',
-    color: colors.textMain,
   },
   donutLabel: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'bold',
-    color: colors.textSub,
     letterSpacing: 1,
     marginTop: 2,
   },
@@ -801,13 +941,11 @@ const styles = StyleSheet.create({
   legendText: {
     flex: 1,
     fontSize: 14,
-    color: colors.textSub,
     fontWeight: '500',
   },
   legendAmount: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.textMain,
     marginRight: 10,
   },
   legendBadge: {
@@ -835,7 +973,6 @@ const styles = StyleSheet.create({
   barTrack: {
     width: '100%',
     maxWidth: 32,
-    backgroundColor: '#F3F4F6',
     borderRadius: 10,
     justifyContent: 'flex-end',
     alignItems: 'center',
@@ -847,18 +984,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   barValue: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '700',
-    color: colors.textSub,
     marginBottom: 2,
+    textAlign: 'center',
   },
   barLabel: {
     fontSize: 11,
-    color: colors.textSub,
     fontWeight: '600',
   },
   barLabelActive: {
-    color: '#6366F1',
     fontWeight: '700',
   },
 
@@ -873,10 +1008,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.textMain,
   },
   viewAllBtn: {
-    color: '#6366F1',
     fontWeight: 'bold',
     fontSize: 13,
   },
@@ -884,7 +1017,6 @@ const styles = StyleSheet.create({
   // Insight Cards
   insightCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 18,
     marginBottom: 12,
@@ -906,17 +1038,14 @@ const styles = StyleSheet.create({
   insightTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.textMain,
     marginBottom: 4,
   },
   insightDesc: {
     fontSize: 13,
-    color: colors.textSub,
     lineHeight: 19,
   },
 
   emptyText: {
-    color: colors.textSub,
     fontSize: 14,
     marginTop: 12,
   },

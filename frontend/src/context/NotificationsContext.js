@@ -138,15 +138,22 @@ export const NotificationsProvider = ({ children }) => {
     }
   }, [notifications]);
 
-  // Auto-fetch when user logs in
+  // Auto-fetch when user logs in and set up periodic polling
   useEffect(() => {
     if (userToken) {
       fetchNotifications();
+
+      // Poll for unread count updates every 60 seconds
+      const interval = setInterval(() => {
+        refreshUnreadCount();
+      }, 60000);
+
+      return () => clearInterval(interval);
     } else {
       setNotifications([]);
       setUnreadCount(0);
     }
-  }, [userToken]);
+  }, [userToken, fetchNotifications, refreshUnreadCount]);
 
   return (
     <NotificationsContext.Provider

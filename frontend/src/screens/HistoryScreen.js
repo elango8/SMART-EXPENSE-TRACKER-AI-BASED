@@ -22,8 +22,10 @@ import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
 
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationsContext';
+import { usePreferences } from '../context/PreferencesContext';
 import api from '../services/api';
 import TransactionItem from '../components/TransactionItem';
 
@@ -63,77 +65,94 @@ const PAYMENT_LIST = [
 ];
 
 // ─── Quick Filter Chip ──────────────────────────────────────
-const QuickChip = ({ label, icon, isActive, onPress, color }) => (
-  <TouchableOpacity
-    activeOpacity={0.7}
-    style={[
-      styles.quickChip,
-      isActive && [styles.quickChipActive, color ? { backgroundColor: color, borderColor: color } : {}],
-    ]}
-    onPress={onPress}
-  >
-    <Ionicons
-      name={icon}
-      size={13}
-      color={isActive ? '#fff' : colors.textSub}
-      style={{ marginRight: 5 }}
-    />
-    <Text style={isActive ? styles.quickChipTextActive : styles.quickChipText}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
-
-// ─── Filter Section in Modal ────────────────────────────────
-const FilterSection = ({ title, icon, children }) => (
-  <View style={styles.filterSection}>
-    <View style={styles.filterSectionHeader}>
-      <Ionicons name={icon} size={16} color="#6366F1" style={{ marginRight: 8 }} />
-      <Text style={styles.filterSectionTitle}>{title}</Text>
-    </View>
-    {children}
-  </View>
-);
-
-// ─── Selectable Chip ────────────────────────────────────────
-const SelectChip = ({ label, icon, color, isSelected, onPress }) => (
-  <TouchableOpacity
-    activeOpacity={0.7}
-    style={[
-      styles.selectChip,
-      isSelected && { backgroundColor: (color || '#6366F1') + '15', borderColor: color || '#6366F1' },
-    ]}
-    onPress={onPress}
-  >
-    {icon && (
+const QuickChip = ({ label, icon, isActive, onPress, color }) => {
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      style={[
+        styles.quickChip,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        isActive && [styles.quickChipActive, color ? { backgroundColor: color, borderColor: color } : {}],
+      ]}
+      onPress={onPress}
+    >
       <Ionicons
         name={icon}
-        size={14}
-        color={isSelected ? (color || '#6366F1') : '#94A3B8'}
+        size={13}
+        color={isActive ? '#fff' : colors.textSub}
         style={{ marginRight: 5 }}
       />
-    )}
-    <Text style={[
-      styles.selectChipText,
-      isSelected && { color: color || '#6366F1', fontWeight: '700' },
-    ]}>
-      {label}
-    </Text>
-    {isSelected && (
-      <View style={[styles.selectChipCheck, { backgroundColor: color || '#6366F1' }]}>
-        <Ionicons name="checkmark" size={9} color="#fff" />
+      <Text style={isActive ? styles.quickChipTextActive : [styles.quickChipText, { color: colors.textSub }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+// ─── Filter Section in Modal ────────────────────────────────
+const FilterSection = ({ title, icon, children }) => {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.filterSection}>
+      <View style={styles.filterSectionHeader}>
+        <Ionicons name={icon} size={16} color={colors.primary} style={{ marginRight: 8 }} />
+        <Text style={[styles.filterSectionTitle, { color: colors.textMain }]}>{title}</Text>
       </View>
-    )}
-  </TouchableOpacity>
-);
+      {children}
+    </View>
+  );
+};
+
+// ─── Selectable Chip ────────────────────────────────────────
+const SelectChip = ({ label, icon, color, isSelected, onPress }) => {
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      style={[
+        styles.selectChip,
+        { backgroundColor: colors.inputBg, borderColor: colors.border },
+        isSelected && { backgroundColor: (color || colors.primary) + '15', borderColor: color || colors.primary },
+      ]}
+      onPress={onPress}
+    >
+      {icon && (
+        <Ionicons
+          name={icon}
+          size={14}
+          color={isSelected ? (color || colors.primary) : colors.textSub}
+          style={{ marginRight: 5 }}
+        />
+      )}
+      <Text style={[
+        styles.selectChipText,
+        { color: colors.textSub },
+        isSelected && { color: color || colors.primary, fontWeight: '700' },
+      ]}>
+        {label}
+      </Text>
+      {isSelected && (
+        <View style={[styles.selectChipCheck, { backgroundColor: color || colors.primary }]}>
+          <Ionicons name="checkmark" size={9} color="#fff" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
 
 /* ══════════════════════════════════════
    MAIN HISTORY SCREEN
    ══════════════════════════════════════ */
 export default function HistoryScreen({ navigation }) {
   const { user } = useContext(AuthContext);
+  const { colors, isDark } = useTheme();
+  const { unreadCount } = useNotifications();
   const [expenses, setExpenses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const { formatAmount, getSymbol } = usePreferences();
+  const currencySymbol = getSymbol();
 
   // ── Search ──
   const [searchQuery, setSearchQuery] = useState('');
@@ -361,15 +380,15 @@ export default function HistoryScreen({ navigation }) {
   selectedPayments.forEach(p => {
     activeFilterChips.push({ label: p, key: `pay-${p}`, onClear: () => setSelectedPayments(prev => prev.filter(x => x !== p)) });
   });
-  if (minAmount) activeFilterChips.push({ label: `Min ₹${minAmount}`, key: 'min', onClear: () => setMinAmount('') });
-  if (maxAmount) activeFilterChips.push({ label: `Max ₹${maxAmount}`, key: 'max', onClear: () => setMaxAmount('') });
+  if (minAmount) activeFilterChips.push({ label: `Min ${currencySymbol}${minAmount}`, key: 'min', onClear: () => setMinAmount('') });
+  if (maxAmount) activeFilterChips.push({ label: `Max ${currencySymbol}${maxAmount}`, key: 'max', onClear: () => setMaxAmount('') });
   if (sortBy !== 'newest') {
     const so = SORT_OPTIONS.find(s => s.key === sortBy);
     activeFilterChips.push({ label: so?.label || sortBy, key: 'sort', onClear: () => setSortBy('newest') });
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
         {/* ── HEADER ── */}
@@ -378,23 +397,31 @@ export default function HistoryScreen({ navigation }) {
             <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
             <Text style={styles.logoText}>Finovo</Text>
           </View>
-          <TouchableOpacity style={styles.notifBtn}>
+          <TouchableOpacity 
+            style={[styles.notifBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => navigation.navigate('Notifications')}
+          >
             <Ionicons name="notifications-outline" size={22} color={colors.primary} />
+            {unreadCount > 0 && (
+              <View style={[styles.notifBadge, { borderColor: colors.background }]}>
+                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
         {/* ── TITLE + SUMMARY ── */}
         <Animated.View entering={FadeInDown.springify().delay(100)}>
-          <Text style={styles.screenTitle}>History</Text>
+          <Text style={[styles.screenTitle, { color: colors.textMain }]}>History</Text>
           <View style={styles.summaryRow}>
-            <View style={styles.summaryChip}>
-              <Ionicons name="receipt-outline" size={14} color="#6366F1" />
-              <Text style={styles.summaryChipText}>{totalFiltered} transactions</Text>
+            <View style={[styles.summaryChip, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF' }]}>
+              <Ionicons name="receipt-outline" size={14} color={isDark ? '#818CF8' : '#6366F1'} />
+              <Text style={[styles.summaryChipText, { color: isDark ? '#818CF8' : '#6366F1' }]}>{totalFiltered} transactions</Text>
             </View>
-            <View style={[styles.summaryChip, { backgroundColor: '#FEE2E2' }]}>
-              <Ionicons name="trending-down" size={14} color="#EF4444" />
-              <Text style={[styles.summaryChipText, { color: '#EF4444' }]}>
-                ₹{totalAmount.toLocaleString('en-IN')}
+            <View style={[styles.summaryChip, { backgroundColor: isDark ? '#2D1518' : '#FEE2E2' }]}>
+              <Ionicons name="trending-down" size={14} color={isDark ? '#FF6B6B' : '#EF4444'} />
+              <Text style={[styles.summaryChipText, { color: isDark ? '#FF6B6B' : '#EF4444' }]}>
+                {formatAmount(totalAmount)}
               </Text>
             </View>
           </View>
@@ -402,12 +429,12 @@ export default function HistoryScreen({ navigation }) {
 
         {/* ── SEARCH + FILTER BUTTON ── */}
         <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.searchRow}>
-          <View style={styles.searchContainer}>
+          <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="search" size={18} color={colors.textSub} style={{ marginRight: 10 }} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.textMain }]}
               placeholder="Search by name, category, payment..."
-              placeholderTextColor="#B0B8C4"
+              placeholderTextColor={isDark ? '#666' : '#B0B8C4'}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -420,13 +447,18 @@ export default function HistoryScreen({ navigation }) {
 
           {/* Filter Icon Button */}
           <TouchableOpacity
-            style={[styles.filterIconBtn, activeFilterCount > 0 && styles.filterIconBtnActive]}
+            style={[
+              styles.filterIconBtn,
+              activeFilterCount > 0 
+                ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                : { backgroundColor: isDark ? '#1E2340' : '#EEF2FF', borderColor: isDark ? '#2D3560' : '#E0E7FF' }
+            ]}
             onPress={openFilterModal}
             activeOpacity={0.7}
           >
-            <Ionicons name="options-outline" size={20} color={activeFilterCount > 0 ? '#fff' : '#6366F1'} />
+            <Ionicons name="options-outline" size={20} color={activeFilterCount > 0 ? '#fff' : (isDark ? '#818CF8' : '#6366F1')} />
             {activeFilterCount > 0 && (
-              <View style={styles.filterBadge}>
+              <View style={[styles.filterBadge, { borderColor: colors.background }]}>
                 <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
               </View>
             )}
@@ -447,7 +479,7 @@ export default function HistoryScreen({ navigation }) {
                 icon={d.icon}
                 isActive={dateRange === d.key}
                 onPress={() => setDateRange(dateRange === d.key ? 'all' : d.key)}
-                color="#6366F1"
+                color={colors.primary}
               />
             ))}
           </ScrollView>
@@ -460,15 +492,19 @@ export default function HistoryScreen({ navigation }) {
               {activeFilterChips.map(chip => (
                 <TouchableOpacity
                   key={chip.key}
-                  style={styles.activeFilterTag}
+                  style={[styles.activeFilterTag, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF', borderColor: isDark ? '#2D3560' : '#C7D2FE' }]}
                   onPress={chip.onClear}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.activeFilterTagText}>{chip.label}</Text>
-                  <Ionicons name="close" size={12} color="#6366F1" style={{ marginLeft: 4 }} />
+                  <Text style={[styles.activeFilterTagText, { color: isDark ? '#818CF8' : '#6366F1' }]}>{chip.label}</Text>
+                  <Ionicons name="close" size={12} color={isDark ? '#818CF8' : '#6366F1'} style={{ marginLeft: 4 }} />
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity style={styles.clearAllTag} onPress={clearActiveFilters} activeOpacity={0.7}>
+              <TouchableOpacity 
+                style={[styles.clearAllTag, { backgroundColor: isDark ? '#2D1518' : '#FEF2F2', borderColor: isDark ? '#4D2528' : '#FECACA' }]} 
+                onPress={clearActiveFilters} 
+                activeOpacity={0.7}
+              >
                 <Ionicons name="refresh" size={12} color="#EF4444" />
                 <Text style={styles.clearAllTagText}>Clear All</Text>
               </TouchableOpacity>
@@ -477,13 +513,16 @@ export default function HistoryScreen({ navigation }) {
         )}
 
         {/* ── ALERT BANNER ── */}
-        <Animated.View entering={FadeInDown.springify().delay(350)} style={styles.alertBanner}>
-          <View style={styles.alertIconBg}>
-            <Ionicons name="sparkles" size={16} color={colors.textMain} />
+        <Animated.View 
+          entering={FadeInDown.springify().delay(350)} 
+          style={[styles.alertBanner, { backgroundColor: isDark ? '#2D1F0E' : '#FFF7ED', borderColor: isDark ? '#4D3520' : '#FED7AA' }]}
+        >
+          <View style={[styles.alertIconBg, { backgroundColor: isDark ? '#4D3520' : '#FFEDD5' }]}>
+            <Ionicons name="sparkles" size={16} color={isDark ? '#FDBA74' : '#EA580C'} />
           </View>
           <View style={styles.alertTextContainer}>
-            <Text style={styles.alertTitle}>Smart Spend Alert</Text>
-            <Text style={styles.alertDesc}>
+            <Text style={[styles.alertTitle, { color: isDark ? '#FDBA74' : '#7C2D12' }]}>Smart Spend Alert</Text>
+            <Text style={[styles.alertDesc, { color: isDark ? '#FED7AA' : '#9A3412' }]}>
               You've spent 15% more on electronics this month compared to your average. Want to adjust your budget?
             </Text>
           </View>
@@ -493,21 +532,24 @@ export default function HistoryScreen({ navigation }) {
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading transactions...</Text>
+            <Text style={[styles.loadingText, { color: colors.textSub }]}>Loading transactions...</Text>
           </View>
         ) : sections.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="receipt-outline" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>No transactions found</Text>
-            <Text style={styles.emptySubtext}>
+            <Ionicons name="receipt-outline" size={48} color={isDark ? '#3D3D4D' : '#D1D5DB'} />
+            <Text style={[styles.emptyTitle, { color: colors.textMain }]}>No transactions found</Text>
+            <Text style={[styles.emptySubtext, { color: colors.textSub }]}>
               {searchQuery || activeFilterCount > 0
                 ? 'Try adjusting your search or filters'
                 : 'Start adding expenses to see them here'}
             </Text>
             {activeFilterCount > 0 && (
-              <TouchableOpacity style={styles.emptyResetBtn} onPress={clearActiveFilters}>
-                <Ionicons name="refresh" size={16} color="#6366F1" />
-                <Text style={styles.emptyResetText}>Reset Filters</Text>
+              <TouchableOpacity 
+                style={[styles.emptyResetBtn, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF' }]} 
+                onPress={clearActiveFilters}
+              >
+                <Ionicons name="refresh" size={16} color={isDark ? '#818CF8' : '#6366F1'} />
+                <Text style={[styles.emptyResetText, { color: isDark ? '#818CF8' : '#6366F1' }]}>Reset Filters</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -515,14 +557,14 @@ export default function HistoryScreen({ navigation }) {
           sections.map((section, idx) => (
             <Animated.View key={idx} entering={FadeInDown.springify().delay(400 + (idx * 60))}>
               {/* Section Header */}
-              <View style={styles.sectionHeader}>
+              <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
                 <View style={styles.sectionLeft}>
-                  <View style={styles.sectionDot} />
-                  <Text style={styles.sectionTitle}>{section.section}</Text>
+                  <View style={[styles.sectionDot, { backgroundColor: colors.primary }]} />
+                  <Text style={[styles.sectionTitle, { color: colors.textSub }]}>{section.section}</Text>
                 </View>
                 <View style={styles.sectionRight}>
-                  <Text style={styles.sectionTotal}>₹{section.total.toLocaleString('en-IN')}</Text>
-                  <Text style={styles.sectionCount}>{section.count}</Text>
+                  <Text style={[styles.sectionTotal, { color: colors.textMain }]}>{formatAmount(section.total)}</Text>
+                  <Text style={[styles.sectionCount, { color: colors.textSub }]}>{section.count}</Text>
                 </View>
               </View>
 
@@ -566,19 +608,22 @@ export default function HistoryScreen({ navigation }) {
           activeOpacity={1}
           onPress={() => setShowFilterModal(false)}
         >
-          <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
+          <TouchableOpacity activeOpacity={1} style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
             {/* Modal Handle */}
-            <View style={styles.modalHandle} />
+            <View style={[styles.modalHandle, { backgroundColor: isDark ? '#3D3D4D' : '#E2E8F0' }]} />
 
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
-                <View style={styles.modalHeaderIcon}>
-                  <Ionicons name="options" size={20} color="#6366F1" />
+                <View style={[styles.modalHeaderIcon, { backgroundColor: isDark ? '#1E2340' : '#EEF2FF' }]}>
+                  <Ionicons name="options" size={20} color={isDark ? '#818CF8' : '#6366F1'} />
                 </View>
-                <Text style={styles.modalHeaderTitle}>Filters & Sort</Text>
+                <Text style={[styles.modalHeaderTitle, { color: colors.textMain }]}>Filters & Sort</Text>
               </View>
-              <TouchableOpacity style={styles.modalClearBtn} onPress={clearAllFilters}>
+              <TouchableOpacity 
+                style={[styles.modalClearBtn, { backgroundColor: isDark ? '#2D1518' : '#FEF2F2', borderColor: isDark ? '#4D2528' : '#FECACA' }]} 
+                onPress={clearAllFilters}
+              >
                 <Ionicons name="refresh" size={14} color="#EF4444" />
                 <Text style={styles.modalClearText}>Reset</Text>
               </TouchableOpacity>
@@ -596,7 +641,7 @@ export default function HistoryScreen({ navigation }) {
                       icon={d.icon}
                       isSelected={tempDateRange === d.key}
                       onPress={() => setTempDateRange(d.key)}
-                      color="#6366F1"
+                      color={colors.primary}
                     />
                   ))}
                 </View>
@@ -637,13 +682,13 @@ export default function HistoryScreen({ navigation }) {
               {/* ── Amount Range ── */}
               <FilterSection title="Amount Range" icon="cash-outline">
                 <View style={styles.amountRangeRow}>
-                  <View style={styles.amountInputWrap}>
-                    <Text style={styles.amountInputLabel}>Min ₹</Text>
+                  <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                    <Text style={styles.amountInputLabel}>Min {currencySymbol}</Text>
                     <TextInput
-                      style={styles.amountRangeInput}
+                      style={[styles.amountRangeInput, { color: colors.textMain }]}
                       keyboardType="numeric"
                       placeholder="0"
-                      placeholderTextColor="#CBD5E1"
+                      placeholderTextColor={isDark ? '#666' : '#CBD5E1'}
                       value={tempMinAmount}
                       onChangeText={setTempMinAmount}
                     />
@@ -651,13 +696,13 @@ export default function HistoryScreen({ navigation }) {
                   <View style={styles.amountDash}>
                     <Text style={styles.amountDashText}>—</Text>
                   </View>
-                  <View style={styles.amountInputWrap}>
-                    <Text style={styles.amountInputLabel}>Max ₹</Text>
+                  <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                    <Text style={styles.amountInputLabel}>Max {currencySymbol}</Text>
                     <TextInput
-                      style={styles.amountRangeInput}
+                      style={[styles.amountRangeInput, { color: colors.textMain }]}
                       keyboardType="numeric"
                       placeholder="∞"
-                      placeholderTextColor="#CBD5E1"
+                      placeholderTextColor={isDark ? '#666' : '#CBD5E1'}
                       value={tempMaxAmount}
                       onChangeText={setTempMaxAmount}
                     />
@@ -675,7 +720,7 @@ export default function HistoryScreen({ navigation }) {
                       icon={s.icon}
                       isSelected={tempSortBy === s.key}
                       onPress={() => setTempSortBy(s.key)}
-                      color="#6366F1"
+                      color={colors.primary}
                     />
                   ))}
                 </View>
@@ -687,7 +732,7 @@ export default function HistoryScreen({ navigation }) {
             {/* ── Apply Button ── */}
             <View style={styles.modalFooter}>
               <TouchableOpacity
-                style={styles.applyBtn}
+                style={[styles.applyBtn, { backgroundColor: colors.primary }]}
                 onPress={applyFilters}
                 activeOpacity={0.85}
               >
@@ -706,7 +751,7 @@ export default function HistoryScreen({ navigation }) {
    STYLES
    ══════════════════════════════════════ */
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: { flex: 1 },
   container: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 60 },
 
   // ── Header ──
@@ -727,109 +772,110 @@ const styles = StyleSheet.create({
   },
 
   // ── Title ──
-  screenTitle: { fontSize: 28, fontWeight: 'bold', color: colors.textMain, marginBottom: 10 },
+  screenTitle: { fontSize: 28, fontWeight: 'bold', marginBottom: 10 },
   summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   summaryChip: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF',
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, gap: 6,
   },
-  summaryChipText: { fontSize: 12, fontWeight: '600', color: '#6366F1' },
+  summaryChipText: { fontSize: 12, fontWeight: '600' },
 
   // ── Search Row ──
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12,
   },
   searchContainer: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
-    borderRadius: 14, paddingHorizontal: 14, height: 46, borderWidth: 1, borderColor: '#F1F5F9',
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    borderRadius: 14, paddingHorizontal: 14, height: 46, borderWidth: 1,
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4 },
       android: { elevation: 1 },
     }),
   },
-  searchInput: { flex: 1, height: '100%', fontSize: 14, color: colors.textMain },
+  searchInput: { flex: 1, height: '100%', fontSize: 14 },
 
   // ── Filter Icon Button ──
   filterIconBtn: {
-    width: 46, height: 46, borderRadius: 14, backgroundColor: '#EEF2FF',
-    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E0E7FF',
+    width: 46, height: 46, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1,
   },
-  filterIconBtnActive: {
-    backgroundColor: '#6366F1', borderColor: '#6366F1',
-    ...Platform.select({
-      ios: { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6 },
-      android: { elevation: 4 },
-    }),
-  },
+  filterIconBtnActive: {},
   filterBadge: {
     position: 'absolute', top: -4, right: -4, width: 18, height: 18,
     borderRadius: 9, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#F8FAFC',
+    borderWidth: 2,
   },
   filterBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff' },
+
+  // Notification Badge on Header
+  notifBadge: {
+    position: 'absolute', top: -6, right: -8,
+    backgroundColor: '#EF4444', borderRadius: 10,
+    minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4, borderWidth: 2,
+  },
+  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
 
   // ── Quick Filter Chips ──
   quickChipRow: { gap: 8, paddingRight: 20, marginBottom: 10 },
   quickChip: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7,
-    borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0',
+    borderRadius: 10, borderWidth: 1,
   },
-  quickChipActive: {
-    backgroundColor: '#6366F1', borderColor: '#6366F1',
-  },
-  quickChipText: { fontSize: 11, fontWeight: '600', color: colors.textSub },
+  quickChipActive: {},
+  quickChipText: { fontSize: 11, fontWeight: '600' },
   quickChipTextActive: { fontSize: 11, fontWeight: '700', color: '#fff' },
 
   // ── Active Filter Tags ──
   activeFiltersRow: { marginBottom: 12 },
   activeFilterTag: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF',
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#C7D2FE',
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1,
   },
-  activeFilterTagText: { fontSize: 11, fontWeight: '600', color: '#6366F1' },
+  activeFilterTagText: { fontSize: 11, fontWeight: '600' },
   clearAllTag: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2',
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, gap: 4,
-    borderWidth: 1, borderColor: '#FECACA',
+    borderWidth: 1,
   },
   clearAllTagText: { fontSize: 11, fontWeight: '700', color: '#EF4444' },
 
   // ── Alert Banner ──
   alertBanner: {
-    flexDirection: 'row', backgroundColor: '#FFF7ED', borderRadius: 16, padding: 16,
-    marginBottom: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FED7AA',
+    flexDirection: 'row', borderRadius: 16, padding: 16,
+    marginBottom: 16, alignItems: 'center', borderWidth: 1,
   },
   alertIconBg: {
-    width: 36, height: 36, borderRadius: 12, backgroundColor: '#FFEDD5',
+    width: 36, height: 36, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
   alertTextContainer: { flex: 1 },
-  alertTitle: { fontSize: 13, fontWeight: '700', color: colors.textMain, marginBottom: 3 },
-  alertDesc: { fontSize: 11, color: colors.textSub, lineHeight: 16 },
+  alertTitle: { fontSize: 13, fontWeight: '700', marginBottom: 3 },
+  alertDesc: { fontSize: 11, lineHeight: 16 },
 
   // ── Loading & Empty ──
   loadingContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
-  loadingText: { marginTop: 12, fontSize: 13, color: colors.textSub },
+  loadingText: { marginTop: 12, fontSize: 13 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 50 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textMain, marginTop: 12 },
-  emptySubtext: { fontSize: 13, color: colors.textSub, marginTop: 4, textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '700', marginTop: 12 },
+  emptySubtext: { fontSize: 13, marginTop: 4, textAlign: 'center' },
   emptyResetBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF',
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginTop: 16, gap: 6,
   },
-  emptyResetText: { fontSize: 13, fontWeight: '700', color: '#6366F1' },
+  emptyResetText: { fontSize: 13, fontWeight: '700' },
 
   // ── Section Header ──
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginTop: 16, marginBottom: 6, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
+    marginTop: 16, marginBottom: 6, paddingBottom: 6, borderBottomWidth: 1,
   },
   sectionLeft: { flexDirection: 'row', alignItems: 'center' },
-  sectionDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6366F1', marginRight: 8 },
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: colors.textSub, letterSpacing: 0.8 },
+  sectionDot: { width: 6, height: 6, borderRadius: 3, marginRight: 8 },
+  sectionTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.8 },
   sectionRight: { alignItems: 'flex-end' },
-  sectionTotal: { fontSize: 13, fontWeight: '700', color: colors.textMain },
-  sectionCount: { fontSize: 10, color: colors.textSub, marginTop: 1 },
+  sectionTotal: { fontSize: 13, fontWeight: '700' },
+  sectionCount: { fontSize: 10, marginTop: 1 },
 
   // ── Transaction Cards ──
   transactionGroup: { gap: 4 },
@@ -842,11 +888,11 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
     maxHeight: SCREEN_HEIGHT * 0.8, paddingBottom: Platform.OS === 'ios' ? 34 : 20,
   },
   modalHandle: {
-    width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0',
+    width: 40, height: 4, borderRadius: 2,
     alignSelf: 'center', marginTop: 12, marginBottom: 16,
   },
   modalHeader: {
@@ -855,14 +901,14 @@ const styles = StyleSheet.create({
   },
   modalHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
   modalHeaderIcon: {
-    width: 36, height: 36, borderRadius: 12, backgroundColor: '#EEF2FF',
+    width: 36, height: 36, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', marginRight: 10,
   },
-  modalHeaderTitle: { fontSize: 18, fontWeight: '800', color: colors.textMain },
+  modalHeaderTitle: { fontSize: 18, fontWeight: '800' },
   modalClearBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2',
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, gap: 5,
-    borderWidth: 1, borderColor: '#FECACA',
+    borderWidth: 1,
   },
   modalClearText: { fontSize: 12, fontWeight: '700', color: '#EF4444' },
 
@@ -873,15 +919,15 @@ const styles = StyleSheet.create({
   filterSectionHeader: {
     flexDirection: 'row', alignItems: 'center', marginBottom: 10,
   },
-  filterSectionTitle: { fontSize: 14, fontWeight: '700', color: colors.textMain },
+  filterSectionTitle: { fontSize: 14, fontWeight: '700' },
 
   // ── Chip Grid ──
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   selectChip: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 10, backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: '#E2E8F0',
+    borderRadius: 10, borderWidth: 1.5,
   },
-  selectChipText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
+  selectChipText: { fontSize: 12, fontWeight: '600' },
   selectChipCheck: {
     width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginLeft: 5,
   },
@@ -889,11 +935,11 @@ const styles = StyleSheet.create({
   // ── Amount Range ──
   amountRangeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   amountInputWrap: {
-    flex: 1, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12,
-    borderWidth: 1.5, borderColor: '#E2E8F0',
+    flex: 1, borderRadius: 12, padding: 12,
+    borderWidth: 1.5,
   },
   amountInputLabel: { fontSize: 10, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.5, marginBottom: 4 },
-  amountRangeInput: { fontSize: 18, fontWeight: '700', color: colors.textMain },
+  amountRangeInput: { fontSize: 18, fontWeight: '700' },
   amountDash: { paddingHorizontal: 4 },
   amountDashText: { fontSize: 18, color: '#CBD5E1', fontWeight: '300' },
 
@@ -901,7 +947,7 @@ const styles = StyleSheet.create({
   modalFooter: { paddingHorizontal: 20, paddingTop: 12 },
   applyBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#6366F1', height: 52, borderRadius: 16,
+    height: 52, borderRadius: 16,
     ...Platform.select({
       ios: { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12 },
       android: { elevation: 6 },

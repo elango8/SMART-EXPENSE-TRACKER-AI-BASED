@@ -4,11 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-// import { PieChart, LineChart } from 'react-native-chart-kit';
-import { colors } from '../theme/colors';
 import { AuthContext } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationsContext';
+import { usePreferences } from '../context/PreferencesContext';
+import { useTransactionDetection } from '../context/TransactionDetectionContext';
 import TransactionItem from '../components/TransactionItem';
-// import ThreeDComponent from '../components/ThreeDComponent';
 
 import api from '../services/api';
 
@@ -16,6 +17,9 @@ const screenWidth = Dimensions.get("window").width;
 
 export default function DashboardScreen({ navigation }) {
   const { user } = useContext(AuthContext);
+  const { colors, isDark } = useTheme();
+  const { unreadCount } = useNotifications();
+  const { pendingCount: detectionPendingCount, isDetectionEnabled } = useTransactionDetection();
 
   const [expenses, setExpenses] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -32,22 +36,7 @@ export default function DashboardScreen({ navigation }) {
     }
   };
 
-  const pieData = analytics?.categoryBreakdown?.map((item, index) => ({
-    name: item.name,
-    amount: item.amount,
-    color: ['#FF6384','#36A2EB','#FFCE56','#4CAF50','#9966FF'][index % 5],
-    legendFontColor: '#333',
-    legendFontSize: 12
-  })) || [];
 
-  const lineData = {
-    labels: analytics?.monthlyTrends?.map(item => item.month) || [],
-    datasets: [
-      {
-        data: analytics?.monthlyTrends?.map(item => item.amount) || []
-      }
-    ]
-  };
 
   // 🔹 Fetch Analytics
   const fetchAnalytics = async () => {
@@ -101,15 +90,11 @@ export default function DashboardScreen({ navigation }) {
   // 🔹 Top Category Insight
   const topCategory = analytics?.categoryBreakdown?.[0]?.name;
 
-  // 🔹 Currency symbol from preferences
-  const currencySymbol = (() => {
-    const c = user?.preferences?.currency || 'INR';
-    const map = { INR: '₹', USD: '$', EUR: '€', GBP: '£', JPY: '¥' };
-    return map[c] || '₹';
-  })();
+  const { formatAmount, getSymbol } = usePreferences();
+  const currencySymbol = getSymbol();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.container}>
 
         {/* Header */}
@@ -118,25 +103,26 @@ export default function DashboardScreen({ navigation }) {
             <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
             <Text style={styles.logoText}>Finovo</Text>
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+          <TouchableOpacity onPress={() => navigation.navigate('Notifications')} style={{ position: 'relative' }}>
             <Ionicons name="notifications-outline" size={24} color={colors.primary} />
+            {unreadCount > 0 && (
+              <View style={[styles.notifBadge, { borderColor: colors.background }]}>
+                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
         {/* Greeting */}
         <Animated.View entering={FadeInDown.springify().delay(100)} style={styles.greeting}>
-          <Text style={styles.greetingTitle}>Good Morning, {user?.name || 'Elango'}</Text>
-          <Text style={styles.greetingSub}>Here is your financial status for today.</Text>
+          <Text style={[styles.greetingTitle, { color: colors.textMain }]}>Good Morning, {user?.name || 'Elango'}</Text>
+          <Text style={[styles.greetingSub, { color: colors.textSub }]}>Here is your financial status for today.</Text>
         </Animated.View>
 
-        {/* Balance Card */}
-        <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.balanceCard}>
-          <View style={[StyleSheet.absoluteFill, { opacity: 0.3, zIndex: -1 }]}>
-            {/* <ThreeDComponent shapeType="torus" color="#FFFFFF" style={{ flex: 1, marginLeft: 120, marginTop: -30 }} /> */}
-          </View>
+        <Animated.View entering={FadeInDown.springify().delay(200)} style={[styles.balanceCard, { backgroundColor: isDark ? '#1E3A5F' : colors.primary }]}>
           <Text style={styles.balanceLabel}>TOTAL EXPENSES</Text>
           <Text style={styles.balanceValue}>
-            {currencySymbol} {(analytics?.totalSpent ?? totalAmount).toFixed(2)}
+            {formatAmount(analytics?.totalSpent ?? totalAmount)}
           </Text>
           <View style={styles.trendContainer}>
             <Ionicons name="trending-up" size={16} color="#FFD166" />
@@ -145,146 +131,57 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.circleDecoration} />
         </Animated.View>
 
-        {/* Pie Chart category breakdown */}
 
-        {analytics && pieData.length > 0 && (
-          <Animated.View entering={FadeInDown.springify().delay(300)} style={{ marginBottom: 20 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10 }}>
-              Category Breakdown
-            </Text>
-
-            {/* <PieChart
-              data={pieData}
-              width={screenWidth - 40}
-              height={220}
-              chartConfig={{
-                color: () => '#000'
-              }}
-              accessor="amount"
-              backgroundColor="transparent"
-              paddingLeft="15"
-              absolute
-            /> */}
-          </Animated.View>
-        )}
-
-        {/*Monthly Trends*/}
-
-        {analytics && lineData.labels.length > 0 && (
-          <Animated.View entering={FadeInDown.springify().delay(400)} style={{ marginBottom: 20 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 10 }}>
-              Monthly Trends
-            </Text>
-
-            {/* <LineChart
-              data={lineData}
-              width={screenWidth - 40}
-              height={220}
-              chartConfig={{
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                decimalPlaces: 0,
-                color: () => '#0DABC6'
-              }}
-              style={{ borderRadius: 16 }}
-            /> */}
-          </Animated.View>
-        )}
-
-        {/* Dynamic Summary Cards */}
-        <Animated.View entering={FadeInDown.springify().delay(480)} style={styles.summarySection}>
-          <Text style={styles.summarySectionTitle}>Quick Insights</Text>
-          <View style={styles.summaryGrid}>
-            {/* Monthly Transactions */}
-            <View style={[styles.summaryCard, { backgroundColor: '#EEF2FF' }]}>
-              <View style={[styles.summaryIconBg, { backgroundColor: '#C7D2FE' }]}>
-                <Ionicons name="calendar" size={18} color="#4F46E5" />
-              </View>
-              <Text style={[styles.summaryCardValue, { color: '#4F46E5' }]}>
-                {dashboardSummary?.monthlyCount ?? '—'}
-              </Text>
-              <Text style={styles.summaryCardLabel}>This Month</Text>
-            </View>
-            {/* Weekly Transactions */}
-            <View style={[styles.summaryCard, { backgroundColor: '#F0FDF4' }]}>
-              <View style={[styles.summaryIconBg, { backgroundColor: '#BBF7D0' }]}>
-                <Ionicons name="trending-up" size={18} color="#16A34A" />
-              </View>
-              <Text style={[styles.summaryCardValue, { color: '#16A34A' }]}>
-                {dashboardSummary?.weeklyCount ?? '—'}
-              </Text>
-              <Text style={styles.summaryCardLabel}>This Week</Text>
-            </View>
-            {/* Top Category */}
-            <View style={[styles.summaryCard, { backgroundColor: '#FFF7ED' }]}>
-              <View style={[styles.summaryIconBg, { backgroundColor: '#FED7AA' }]}>
-                <Ionicons name="trophy" size={18} color="#EA580C" />
-              </View>
-              <Text style={[styles.summaryCardValue, { color: '#EA580C' }]} numberOfLines={1}>
-                {dashboardSummary?.topCategory?.name ?? '—'}
-              </Text>
-              <Text style={styles.summaryCardLabel}>Top Category</Text>
-            </View>
-            {/* Budget Remaining */}
-            <View style={[styles.summaryCard, { backgroundColor: dashboardSummary?.budgetRemaining < 0 ? '#FEF2F2' : '#ECFDF5' }]}>
-              <View style={[styles.summaryIconBg, { backgroundColor: dashboardSummary?.budgetRemaining < 0 ? '#FECACA' : '#A7F3D0' }]}>
-                <Ionicons 
-                  name={dashboardSummary?.budgetRemaining < 0 ? 'warning' : 'wallet'} 
-                  size={18} 
-                  color={dashboardSummary?.budgetRemaining < 0 ? '#DC2626' : '#059669'} 
-                />
-              </View>
-              <Text style={[styles.summaryCardValue, { color: dashboardSummary?.budgetRemaining < 0 ? '#DC2626' : '#059669' }]}>
-                {dashboardSummary ? `${currencySymbol}${Math.abs(dashboardSummary.budgetRemaining).toLocaleString('en-IN')}` : '—'}
-              </Text>
-              <Text style={styles.summaryCardLabel}>
-                {dashboardSummary?.budgetRemaining < 0 ? 'Over Budget' : 'Budget Left'}
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
 
         {/* Most Recent Transaction Mini Card */}
         {dashboardSummary?.recentTransaction && (
-          <Animated.View entering={FadeInDown.springify().delay(490)} style={styles.recentMiniCard}>
-            <View style={styles.recentMiniIconBg}>
+          <Animated.View entering={FadeInDown.springify().delay(490)} style={[styles.recentMiniCard, { backgroundColor: isDark ? '#1E1530' : '#FAF5FF', borderColor: isDark ? '#2D2540' : '#EDE9FE' }]}>
+            <View style={[styles.recentMiniIconBg, { backgroundColor: isDark ? '#2D2540' : '#EDE9FE' }]}>
               <Ionicons name="flash" size={16} color="#7C3AED" />
             </View>
             <View style={styles.recentMiniInfo}>
               <Text style={styles.recentMiniTitle}>Latest Transaction</Text>
-              <Text style={styles.recentMiniSub} numberOfLines={1}>
+              <Text style={[styles.recentMiniSub, { color: colors.textMain }]} numberOfLines={1}>
                 {dashboardSummary.recentTransaction.title} • {dashboardSummary.recentTransaction.category}
               </Text>
             </View>
             <Text style={styles.recentMiniAmount}>
-              -{currencySymbol}{Math.abs(dashboardSummary.recentTransaction.amount).toLocaleString('en-IN')}
+              -{formatAmount(Math.abs(dashboardSummary.recentTransaction.amount))}
             </Text>
           </Animated.View>
         )}
 
         {/* Pending */}
-        <Animated.View entering={FadeInDown.springify().delay(500)} style={styles.pendingCard}>
+        <Animated.View entering={FadeInDown.springify().delay(500)} style={[styles.pendingCard, { backgroundColor: isDark ? '#2D1518' : '#FFF5F5' }]}>
           <View style={styles.pendingHeader}>
-            <View style={styles.pendingIconBg}>
+            <View style={[styles.pendingIconBg, { backgroundColor: colors.danger }]}>
               <Ionicons name="alert" size={20} color="#fff" />
             </View>
-            <View style={styles.pendingBadge}>
-              <Text style={styles.pendingBadgeText}>
-                {dashboardSummary?.pendingCount ?? 0} Pending
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {isDetectionEnabled && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16,185,129,0.12)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981', marginRight: 4 }} />
+                  <Text style={{ color: '#10B981', fontSize: 10, fontWeight: '700' }}>Auto</Text>
+                </View>
+              )}
+              <View style={[styles.pendingBadge, { backgroundColor: isDark ? '#4D2528' : '#FFD6D6' }]}>
+                <Text style={[styles.pendingBadgeText, { color: colors.danger }]}>
+                  {detectionPendingCount || dashboardSummary?.pendingCount || 0} Pending
+                </Text>
+              </View>
             </View>
           </View>
           <View style={styles.pendingRow}>
             <View>
-              <Text style={styles.pendingTitle}>Confirm Actions</Text>
-              <Text style={styles.pendingSub}>
-                {dashboardSummary?.pendingCount > 0
-                  ? `${dashboardSummary.pendingCount} items need your review`
+              <Text style={[styles.pendingTitle, { color: colors.textMain }]}>Confirm Actions</Text>
+              <Text style={[styles.pendingSub, { color: colors.danger }]}>
+                {(detectionPendingCount || dashboardSummary?.pendingCount) > 0
+                  ? `${detectionPendingCount || dashboardSummary?.pendingCount} items need your review`
                   : 'No pending items'}
               </Text>
             </View>
             <TouchableOpacity 
-              style={styles.pendingBtn}
+              style={[styles.pendingBtn, { backgroundColor: colors.success }]}
               onPress={() => navigation.navigate('PendingConfirmations')}
             >
               <Text style={styles.pendingBtnText}>View</Text>
@@ -292,38 +189,37 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </Animated.View>
 
-        {/* Stats */}
         <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <View style={styles.statIconContainer}>
+          <View style={[styles.statBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.statIconContainer, { backgroundColor: isDark ? '#132218' : '#F8F9FA' }]}>
               <Ionicons name="calendar-outline" size={20} color={colors.success} />
             </View>
             <View>
-              <Text style={styles.statLabel}>TODAY'S TOTAL SPENDINGS</Text>
-              <Text style={styles.statValue}>{currencySymbol} {todaySpending.toFixed(2)}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSub }]}>TODAY'S TOTAL SPENDINGS</Text>
+              <Text style={[styles.statValue, { color: colors.textMain }]}>{formatAmount(todaySpending)}</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <View style={styles.statIconContainer}>
+          <View style={[styles.statBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.statIconContainer, { backgroundColor: isDark ? '#1E2340' : '#F8F9FA' }]}>
               <Ionicons name="calendar-outline" size={20} color={colors.primary} />
             </View>
             <View>
-              <Text style={styles.statLabel}>WEEKLY SPENDING</Text>
-              <Text style={styles.statValue}>{currencySymbol} {weeklySpending.toFixed(2)}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSub }]}>WEEKLY SPENDING</Text>
+              <Text style={[styles.statValue, { color: colors.textMain }]}>{formatAmount(weeklySpending)}</Text>
             </View>
           </View>
         </View>
 
         {/* Insight */}
-        <Animated.View entering={FadeInDown.springify().delay(700)} style={styles.insightCard}>
-          <View style={styles.insightRobot}>
+        <Animated.View entering={FadeInDown.springify().delay(700)} style={[styles.insightCard, { backgroundColor: isDark ? '#2D1B35' : '#FCE4EC' }]}>
+          <View style={[styles.insightRobot, { backgroundColor: isDark ? '#1A1D27' : '#fff' }]}>
             <Ionicons name="hardware-chip-outline" size={20} color="#9C27B0" />
           </View>
-          <Text style={styles.insightTitle}>Ethereal Curator Insight</Text>
-          <Text style={styles.insightDesc}>
+          <Text style={[styles.insightTitle, { color: isDark ? '#F48FB1' : '#880E4F' }]}>Ethereal Curator Insight</Text>
+          <Text style={[styles.insightDesc, { color: isDark ? '#CE93D8' : '#C2185B' }]}>
             You spent more on {topCategory || 'expenses'} this week 💸. Try optimizing it to save more.
           </Text>
         </Animated.View>
@@ -331,11 +227,11 @@ export default function DashboardScreen({ navigation }) {
         {/* Recent Transactions */}
         <Animated.View entering={FadeInDown.springify().delay(800)} style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionTitle}>Recent Transactions</Text>
-            <Text style={styles.sectionSub}>Your latest activity</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textMain }]}>Recent Transactions</Text>
+            <Text style={[styles.sectionSub, { color: colors.textSub }]}>Your latest activity</Text>
           </View>
-          <TouchableOpacity style={styles.viewAllPill} onPress={() => navigation.navigate('History')}>
-            <Text style={styles.viewAllBtn}>View All</Text>
+          <TouchableOpacity style={[styles.viewAllPill, { backgroundColor: isDark ? '#1E2340' : '#EBF2FF' }]} onPress={() => navigation.navigate('History')}>
+            <Text style={[styles.viewAllBtn, { color: colors.primary }]}>View All</Text>
             <Ionicons name="arrow-forward" size={14} color={colors.primary} style={{ marginLeft: 4 }} />
           </TouchableOpacity>
         </Animated.View>
@@ -345,8 +241,8 @@ export default function DashboardScreen({ navigation }) {
         ) : expenses.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={48} color={colors.border} />
-            <Text style={styles.emptyTitle}>No transactions yet</Text>
-            <Text style={styles.emptySub}>Start adding expenses to see them here</Text>
+            <Text style={[styles.emptyTitle, { color: colors.textMain }]}>No transactions yet</Text>
+            <Text style={[styles.emptySub, { color: colors.textSub }]}>Start adding expenses to see them here</Text>
           </View>
         ) : (
           [...expenses]
@@ -373,19 +269,28 @@ export default function DashboardScreen({ navigation }) {
   );
 }
 
-// 🔹 Styles unchanged
+// 🔹 Styles
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.white },
+  safeArea: { flex: 1 },
   container: { padding: 24, paddingBottom: 60 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30, marginTop: 10 },
   logoRow: { flexDirection: 'row', alignItems: 'center' },
   logoImage: { width: 32, height: 32, marginRight: 8 },
   logoText: { fontSize: 20, fontWeight: 'bold', color: '#0DABC6' },
   greeting: { marginBottom: 24 },
-  greetingTitle: { fontSize: 24, fontWeight: 'bold', color: colors.textMain, marginBottom: 4 },
-  greetingSub: { fontSize: 13, color: colors.textSub },
+  greetingTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
+  greetingSub: { fontSize: 13 },
 
-  balanceCard: { backgroundColor: colors.dashboardCardBg, borderRadius: 24, padding: 28, marginBottom: 20, overflow: 'hidden' },
+  // Notification badge
+  notifBadge: {
+    position: 'absolute', top: -6, right: -8,
+    backgroundColor: '#EF4444', borderRadius: 10,
+    minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4, borderWidth: 2, borderColor: '#fff',
+  },
+  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+
+  balanceCard: { borderRadius: 24, padding: 28, marginBottom: 20, overflow: 'hidden' },
   balanceLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: 'bold', letterSpacing: 1, marginBottom: 8 },
   balanceValue: { color: '#fff', fontSize: 36, fontWeight: 'bold', marginBottom: 12 },
   trendContainer: { flexDirection: 'row', alignItems: 'center' },
@@ -394,7 +299,7 @@ const styles = StyleSheet.create({
 
   // Dynamic Summary Section
   summarySection: { marginBottom: 20 },
-  summarySectionTitle: { fontSize: 16, fontWeight: 'bold', color: colors.textMain, marginBottom: 12 },
+  summarySectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   summaryCard: {
     width: (screenWidth - 58) / 2,
@@ -407,53 +312,52 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginBottom: 10,
   },
   summaryCardValue: { fontSize: 18, fontWeight: '800', marginBottom: 4 },
-  summaryCardLabel: { fontSize: 11, fontWeight: '600', color: colors.textSub },
+  summaryCardLabel: { fontSize: 11, fontWeight: '600' },
 
   // Recent Mini Card
   recentMiniCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FAF5FF', borderRadius: 16, padding: 14,
-    marginBottom: 20, borderWidth: 1, borderColor: '#EDE9FE',
+    borderRadius: 16, padding: 14,
+    marginBottom: 20, borderWidth: 1,
   },
   recentMiniIconBg: {
-    width: 36, height: 36, borderRadius: 12, backgroundColor: '#EDE9FE',
+    width: 36, height: 36, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
   recentMiniInfo: { flex: 1 },
   recentMiniTitle: { fontSize: 10, fontWeight: '700', color: '#7C3AED', letterSpacing: 0.5, marginBottom: 2 },
-  recentMiniSub: { fontSize: 13, fontWeight: '600', color: colors.textMain },
+  recentMiniSub: { fontSize: 13, fontWeight: '600' },
   recentMiniAmount: { fontSize: 15, fontWeight: '800', color: '#DC2626' },
 
-  pendingCard: { backgroundColor: '#FFF5F5', borderRadius: 24, padding: 20, marginBottom: 20 },
+  pendingCard: { borderRadius: 24, padding: 20, marginBottom: 20 },
   pendingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  pendingIconBg: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
-  pendingBadge: { backgroundColor: '#FFD6D6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
-  pendingBadgeText: { color: colors.danger, fontWeight: 'bold', fontSize: 12 },
+  pendingIconBg: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  pendingBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
+  pendingBadgeText: { fontWeight: 'bold', fontSize: 12 },
   pendingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pendingTitle: { fontSize: 16, fontWeight: 'bold', color: colors.textMain, marginBottom: 4 },
-  pendingSub: { fontSize: 12, color: colors.danger },
-  pendingBtn: { backgroundColor: colors.success, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 24 },
+  pendingTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  pendingSub: { fontSize: 12 },
+  pendingBtn: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 24 },
   pendingBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 13, letterSpacing: 0.5 },
 
   statsRow: { marginBottom: 16 },
-  statBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 24, padding: 16 },
-  statIconContainer: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#F8F9FA', alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  statLabel: { fontSize: 10, fontWeight: 'bold', color: colors.textSub, letterSpacing: 1, marginBottom: 6 },
-  statValue: { fontSize: 24, fontWeight: 'bold', color: colors.textMain },
+  statBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 24, padding: 16 },
+  statIconContainer: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
+  statLabel: { fontSize: 10, fontWeight: 'bold', letterSpacing: 1, marginBottom: 6 },
+  statValue: { fontSize: 24, fontWeight: 'bold' },
 
-  insightCard: { backgroundColor: '#FCE4EC', borderRadius: 24, padding: 24, marginBottom: 30, marginTop: 10 },
-  insightRobot: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  insightTitle: { fontSize: 16, fontWeight: 'bold', color: '#880E4F', marginBottom: 8 },
-  insightDesc: { fontSize: 14, color: '#C2185B', lineHeight: 22 },
+  insightCard: { borderRadius: 24, padding: 24, marginBottom: 30, marginTop: 10 },
+  insightRobot: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  insightTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 8 },
+  insightDesc: { fontSize: 14, lineHeight: 22 },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textMain },
-  sectionSub: { fontSize: 12, color: colors.textSub, marginTop: 2 },
-  viewAllPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EBF2FF', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  viewAllBtn: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold' },
+  sectionSub: { fontSize: 12, marginTop: 2 },
+  viewAllPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  viewAllBtn: { fontWeight: '700', fontSize: 13 },
 
   emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textMain, marginTop: 12 },
-  emptySub: { fontSize: 13, color: colors.textSub, marginTop: 4 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', marginTop: 12 },
+  emptySub: { fontSize: 13, marginTop: 4 },
 });
-

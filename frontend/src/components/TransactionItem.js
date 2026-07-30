@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthContext';
+import { usePreferences } from '../context/PreferencesContext';
 import api from '../services/api';
 
 // ── Payment method icon & color mapping ──────────────────────────
@@ -66,8 +68,11 @@ const categoryIcons = {
   'Default': 'pricetag-outline',
 };
 
-export default function TransactionItem({ expense, title, category, date, amount, isNegative = true, disablePress = false, showActions = true, onDelete, onRefresh }) {
+const TransactionItem = React.memo(function TransactionItem({ expense, title, category, date, amount, isNegative = true, disablePress = false, showActions = true, onDelete, onRefresh }) {
   const navigation = useNavigation();
+  const { colors, isDark } = useTheme();
+  const { formatAmount, getSymbol } = usePreferences();
+  const currencySymbol = getSymbol();
   const pm = getPaymentStyle(expense?.account);
   const catIcon = categoryIcons[category?.split(' • ')[0]] || categoryIcons['Default'];
   const [isDeleting, setIsDeleting] = useState(false);
@@ -91,7 +96,7 @@ export default function TransactionItem({ expense, title, category, date, amount
   const handleDelete = () => {
     Alert.alert(
       '🗑️ Delete Expense',
-      `Are you sure you want to permanently delete "${title || 'this expense'}"?\n\nAmount: ₹${Math.abs(amount).toLocaleString('en-IN')}\n\nThis action cannot be undone.`,
+      `Are you sure you want to permanently delete "${title || 'this expense'}"?\n\nAmount: ${formatAmount(Math.abs(amount))}\n\nThis action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -122,48 +127,48 @@ export default function TransactionItem({ expense, title, category, date, amount
       style={[
         styles.card,
         {
-          backgroundColor: pm.gradient1,
-          borderColor: pm.gradient2,
+          backgroundColor: isDark ? colors.surface : pm.gradient1,
+          borderColor: isDark ? colors.border : pm.gradient2,
         },
         isDeleting && { opacity: 0.4 },
       ]}
     >
       {/* Glassy overlay */}
-      <View style={[styles.glassOverlay, { backgroundColor: pm.gradient2 }]} />
-      <View style={styles.glassShine} />
+      {!isDark && <View style={[styles.glassOverlay, { backgroundColor: pm.gradient2 }]} />}
+      {!isDark && <View style={styles.glassShine} />}
 
       {/* ── Main Content Row ── */}
       <View style={styles.mainRow}>
         {/* Left: payment icon */}
         <View style={styles.iconSection}>
-          <View style={[styles.iconCircle, { backgroundColor: pm.iconBg + '40' }]}>
-            <Ionicons name={pm.icon} size={16} color={pm.iconColor} />
+          <View style={[styles.iconCircle, { backgroundColor: isDark ? (pm.accent + '20') : (pm.iconBg + '40') }]}>
+            <Ionicons name={pm.icon} size={16} color={isDark ? pm.accent : pm.iconColor} />
           </View>
-          <Text style={[styles.paymentLabel, { color: pm.iconColor }]}>{pm.label}</Text>
+          <Text style={[styles.paymentLabel, { color: isDark ? pm.accent : pm.iconColor }]}>{pm.label}</Text>
         </View>
 
         {/* Middle: details */}
         <View style={styles.details}>
-          <Text style={styles.title} numberOfLines={1}>{title || 'Untitled'}</Text>
+          <Text style={[styles.title, { color: colors.textMain }]} numberOfLines={1}>{title || 'Untitled'}</Text>
           <View style={styles.metaRow}>
             <Ionicons name={catIcon} size={10} color={colors.textSub} />
-            <Text style={styles.categoryText} numberOfLines={1}>{category}</Text>
+            <Text style={[styles.categoryText, { color: colors.textSub }]} numberOfLines={1}>{category}</Text>
           </View>
-          {date ? <Text style={styles.dateText}>{date}</Text> : null}
+          {date ? <Text style={[styles.dateText, { color: colors.textSub }]}>{date}</Text> : null}
         </View>
 
         {/* Right: amount */}
         <View style={styles.amountSection}>
-          <Text style={[styles.amount, { color: isNegative ? '#D32F2F' : '#2E7D32' }]}>
-            {isNegative ? '-' : '+'}₹{Math.abs(amount).toLocaleString('en-IN')}
+          <Text style={[styles.amount, { color: isNegative ? (isDark ? '#FCA5A5' : '#D32F2F') : (isDark ? '#A7F3D0' : '#2E7D32') }]}>
+            {isNegative ? '-' : '+'}{formatAmount(Math.abs(amount))}
           </Text>
-          <View style={[styles.amountBadge, { backgroundColor: isNegative ? '#FFEBEE' : '#E8F5E9' }]}>
+          <View style={[styles.amountBadge, { backgroundColor: isDark ? (isNegative ? '#7F1D1D30' : '#064E3B30') : (isNegative ? '#FFEBEE' : '#E8F5E9') }]}>
             <Ionicons
               name={isNegative ? 'arrow-down' : 'arrow-up'}
               size={8}
-              color={isNegative ? '#D32F2F' : '#2E7D32'}
+              color={isNegative ? (isDark ? '#FCA5A5' : '#D32F2F') : (isDark ? '#A7F3D0' : '#2E7D32')}
             />
-            <Text style={[styles.amountBadgeText, { color: isNegative ? '#D32F2F' : '#2E7D32' }]}>
+            <Text style={[styles.amountBadgeText, { color: isNegative ? (isDark ? '#FCA5A5' : '#D32F2F') : (isDark ? '#A7F3D0' : '#2E7D32') }]}>
               {isNegative ? 'Expense' : 'Income'}
             </Text>
           </View>
@@ -173,7 +178,7 @@ export default function TransactionItem({ expense, title, category, date, amount
       {/* ── Action Buttons ── */}
       {!disablePress && showActions && (
         <View style={styles.actionRow}>
-          <View style={styles.actionDivider} />
+          <View style={[styles.actionDivider, { backgroundColor: colors.border }]} />
           <View style={styles.actionButtons}>
             {/* Edit Button */}
             <TouchableOpacity
@@ -200,7 +205,9 @@ export default function TransactionItem({ expense, title, category, date, amount
       )}
     </View>
   );
-}
+});
+
+export default TransactionItem;
 
 const styles = StyleSheet.create({
   card: {
@@ -278,7 +285,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.textMain,
     marginBottom: 2,
   },
   metaRow: {
@@ -288,14 +294,11 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 10,
-    color: colors.textSub,
     marginLeft: 3,
     fontWeight: '500',
   },
   dateText: {
     fontSize: 9,
-    color: colors.textSub,
-    opacity: 0.7,
     marginTop: 1,
   },
 

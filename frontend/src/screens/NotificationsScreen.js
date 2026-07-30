@@ -45,7 +45,7 @@ const TYPE_COLORS_DARK = {
 // Undo snackbar timeout
 const UNDO_TIMEOUT = 4000;
 
-function SwipeableNotificationCard({ item, index, onMarkRead, onDelete, colors, isDark }) {
+const SwipeableNotificationCard = React.memo(function SwipeableNotificationCard({ item, index, onMarkRead, onDelete, colors, isDark }) {
   const translateX = useSharedValue(0);
   const itemHeight = useSharedValue(1);
   const isDeleting = useRef(false);
@@ -177,7 +177,7 @@ function SwipeableNotificationCard({ item, index, onMarkRead, onDelete, colors, 
       </GestureDetector>
     </Animated.View>
   );
-}
+});
 
 export default function NotificationsScreen({ navigation }) {
   const { colors, isDark } = useTheme();

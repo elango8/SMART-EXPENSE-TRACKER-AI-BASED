@@ -1,4 +1,7 @@
 const Expense = require('../models/Expense');
+const User = require('../models/User');
+const Notification = require('../models/Notification');
+const mongoose = require('mongoose');
 
 const getExpenses = async (req, res) => {
   try {
@@ -31,7 +34,7 @@ const getExpenses = async (req, res) => {
 
 const addExpense = async (req, res) => {
   try {
-    const { amount, category, date, account } = req.body;
+    const { amount, category, date, account, merchant, source, status, note, reference, transactionType } = req.body;
     let { title } = req.body;
     
     if (!amount || !category) {
@@ -39,21 +42,109 @@ const addExpense = async (req, res) => {
     }
 
     if (!title) {
-      title = category;
+      title = merchant || category;
     }
 
     if (amount <= 0) {
-  return res.status(400).json({ message: 'Amount must be greater than 0' });
-}
+      return res.status(400).json({ message: 'Amount must be greater than 0' });
+    }
 
     const expense = await Expense.create({
       userId: req.user._id,
       title,
       amount,
       category,
+      merchant: merchant || '',
+      note: note || '',
+      source: source || 'MANUAL',
+      status: status || 'confirmed',
+      reference: reference || '',
+      transactionType: transactionType || 'Debit',
       account: account || 'Cash',
       date: date ? new Date(date) : new Date()
     });
+
+    // --- Budget Alert Notifications ---
+    try {
+      const user = await User.findById(req.user._id).select('preferences').lean();
+      const prefs = user?.preferences;
+
+      // Only generate alerts if budgetAlerts AND notifications are enabled
+      if (prefs?.budgetAlerts && prefs?.notifications) {
+        const monthlyBudget = prefs.monthlyBudget || 5000;
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        // Get total monthly spending including the new expense
+        const monthlyAgg = await Expense.aggregate([
+          {
+            $match: {
+              userId: new mongoose.Types.ObjectId(req.user._id),
+              date: { $gte: startOfMonth },
+            },
+          },
+          { $group: { _id: null, totalSpent: { $sum: '$amount' } } },
+        ]);
+
+        const totalSpent = monthlyAgg[0]?.totalSpent || 0;
+        const percentUsed = (totalSpent / monthlyBudget) * 100;
+
+        // Check thresholds and create notification if crossed
+        if (percentUsed >= 100) {
+          // Check if we already sent this alert this month
+          const existingAlert = await Notification.findOne({
+            user: req.user._id,
+            type: 'budget_alert',
+            title: 'Budget Exceeded',
+            createdAt: { $gte: startOfMonth },
+          });
+          if (!existingAlert) {
+            await Notification.create({
+              user: req.user._id,
+              title: 'Budget Exceeded',
+              message: 'Budget Exceeded: You have crossed your monthly budget.',
+              type: 'budget_alert',
+              icon: 'alert-circle',
+            });
+          }
+        } else if (percentUsed >= 90) {
+          const existingAlert = await Notification.findOne({
+            user: req.user._id,
+            type: 'budget_alert',
+            title: 'High Budget Warning',
+            createdAt: { $gte: startOfMonth },
+          });
+          if (!existingAlert) {
+            await Notification.create({
+              user: req.user._id,
+              title: 'High Budget Warning',
+              message: `Alert: You have used ${Math.round(percentUsed)}% of your budget.`,
+              type: 'budget_alert',
+              icon: 'alert-circle',
+            });
+          }
+        } else if (percentUsed >= 80) {
+          const existingAlert = await Notification.findOne({
+            user: req.user._id,
+            type: 'budget_alert',
+            title: 'Budget Warning',
+            createdAt: { $gte: startOfMonth },
+          });
+          if (!existingAlert) {
+            await Notification.create({
+              user: req.user._id,
+              title: 'Budget Warning',
+              message: `Warning: You have used ${Math.round(percentUsed)}% of your budget.`,
+              type: 'budget_alert',
+              icon: 'alert-circle',
+            });
+          }
+        }
+      }
+    } catch (alertErr) {
+      // Budget alerts are non-critical — log error but don't fail the expense creation
+      console.log('Budget alert check error (non-critical):', alertErr.message);
+    }
     
     res.status(201).json(expense);
   } catch (error) {

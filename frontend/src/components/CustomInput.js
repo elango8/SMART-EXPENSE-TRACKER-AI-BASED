@@ -1,16 +1,18 @@
 import React from 'react';
 import { View, TextInput, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 export default function CustomInput({ label, icon, rightIcon, onRightIconPress, secureTextEntry, ...props }) {
+  const { colors, isDark } = useTheme();
+
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label.toUpperCase()}</Text>}
-      <View style={styles.inputContainer}>
+      {label && <Text style={[styles.label, { color: colors.textSub }]}>{label.toUpperCase()}</Text>}
+      <View style={[styles.inputContainer, { backgroundColor: isDark ? '#252535' : colors.inputBg }]}>
         {icon && <Ionicons name={icon} size={20} color={colors.textSub} style={styles.icon} />}
         <TextInput 
-          style={styles.input} 
+          style={[styles.input, { color: colors.textMain }]} 
           placeholderTextColor={colors.textSub}
           secureTextEntry={secureTextEntry}
           {...props} 
@@ -37,14 +39,12 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: colors.textSub,
     marginBottom: 8,
     letterSpacing: 1,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.inputBg,
     borderRadius: 24,
     paddingHorizontal: 16,
     height: 56,
@@ -57,7 +57,6 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: colors.textMain,
     fontSize: 16,
     height: '100%',
   }

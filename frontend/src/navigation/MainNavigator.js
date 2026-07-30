@@ -10,34 +10,43 @@ import AddExpenseScreen from '../screens/AddExpenseScreen';
 import PendingConfirmationsScreen from '../screens/PendingConfirmationsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import AppPreferencesScreen from '../screens/AppPreferencesScreen';
-import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
 import SecuritySettingsScreen from '../screens/SecuritySettingsScreen';
+import TransactionPermissionScreen from '../screens/TransactionPermissionScreen';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 import EditExpenseScreen from '../screens/EditExpenseScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const CustomTabBarButton = ({ children, onPress }) => (
+const CustomTabBarButton = ({ children, onPress, colors }) => (
   <View style={styles.customTabBarButtonContainer}>
     <TouchableOpacity
-      style={styles.customTabBarButton}
+      style={[styles.customTabBarButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <Ionicons name="add" size={32} color={colors.white} />
+      <Ionicons name="add" size={32} color="#fff" />
     </TouchableOpacity>
   </View>
 );
 
 const TabNavigator = ({ navigation }) => {
+  const { colors, isDark } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            backgroundColor: colors.surface,
+            borderTopColor: isDark ? colors.border : 'transparent',
+            borderTopWidth: isDark ? 1 : 0,
+          }
+        ],
       }}
     >
       <Tab.Screen 
@@ -45,7 +54,7 @@ const TabNavigator = ({ navigation }) => {
         component={DashboardScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.iconContainer, focused && styles.activeIconContainer]}>
+            <View style={[styles.iconContainer, focused && { backgroundColor: isDark ? '#1E2340' : '#F7EEFF' }]}>
               <Ionicons name={focused ? 'grid' : 'grid-outline'} size={20} color={focused ? colors.primary : colors.textSub} />
               <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.iconText, { color: focused ? colors.primary : colors.textSub }]}>DASHBOARD</Text>
             </View>
@@ -57,7 +66,7 @@ const TabNavigator = ({ navigation }) => {
         component={HistoryScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.iconContainer, focused && styles.activeIconContainer]}>
+            <View style={[styles.iconContainer, focused && { backgroundColor: isDark ? '#1E2340' : '#F7EEFF' }]}>
               <Ionicons name={focused ? 'time' : 'time-outline'} size={20} color={focused ? colors.primary : colors.textSub} />
               <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.iconText, { color: focused ? colors.primary : colors.textSub }]}>HISTORY</Text>
             </View>
@@ -73,6 +82,7 @@ const TabNavigator = ({ navigation }) => {
           tabBarButton: (props) => (
             <CustomTabBarButton 
               {...props} 
+              colors={colors}
               onPress={() => navigation.navigate('AddExpense')}
             />
           )
@@ -84,7 +94,7 @@ const TabNavigator = ({ navigation }) => {
         component={AnalyticsScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.iconContainer, focused && styles.activeIconContainer]}>
+            <View style={[styles.iconContainer, focused && { backgroundColor: isDark ? '#1E2340' : '#F7EEFF' }]}>
               <Ionicons name={focused ? 'bar-chart' : 'bar-chart-outline'} size={20} color={focused ? colors.primary : colors.textSub} />
               <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.iconText, { color: focused ? colors.primary : colors.textSub }]}>ANALYTICS</Text>
             </View>
@@ -96,7 +106,7 @@ const TabNavigator = ({ navigation }) => {
         component={ProfileScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.iconContainer, focused && styles.activeIconContainer]}>
+            <View style={[styles.iconContainer, focused && { backgroundColor: isDark ? '#1E2340' : '#F7EEFF' }]}>
               <Ionicons name={focused ? 'person' : 'person-outline'} size={20} color={focused ? colors.primary : colors.textSub} />
               <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.iconText, { color: focused ? colors.primary : colors.textSub }]}>PROFILE</Text>
             </View>
@@ -115,9 +125,9 @@ const MainNavigator = () => {
       <Stack.Screen name="PendingConfirmations" component={PendingConfirmationsScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="AppPreferences" component={AppPreferencesScreen} />
-      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
       <Stack.Screen name="SecuritySettings" component={SecuritySettingsScreen} />
       <Stack.Screen name="EditExpense" component={EditExpenseScreen} />
+      <Stack.Screen name="TransactionPermission" component={TransactionPermissionScreen} />
     </Stack.Navigator>
   );
 };
@@ -129,7 +139,6 @@ const styles = StyleSheet.create({
     left: 10,
     right: 10,
     elevation: 8,
-    backgroundColor: colors.white,
     borderRadius: 30,
     height: 65,
     shadowColor: '#000',
@@ -139,7 +148,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 10,
-    borderTopWidth: 0,
     paddingHorizontal: 0,
   },
   iconContainer: {
@@ -151,9 +159,6 @@ const styles = StyleSheet.create({
     width:65,
     height:55, 
     marginTop: Platform.OS === 'ios' ? 15 : 25, 
-  },
-  activeIconContainer: {
-    backgroundColor: '#F7EEFF', 
   },
   iconText: {
     fontSize: 9,
@@ -170,10 +175,8 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.primary,
     shadowOffset: {
       width: 0,
       height: 6,
